@@ -4,34 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin · Zona Quente RJ</title>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #0d0d0d;
     color: #fff;
-    padding: 16px;
+    padding: 20px;
     line-height: 1.5;
-    min-height: 100vh;
   }
   .container { max-width: 800px; margin: 0 auto; }
   h1 { font-size: 22px; margin-bottom: 4px; }
-  .subtitle { color: #888; font-size: 13px; margin-bottom: 20px; }
-
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 24px; }
   .card {
     background: #141414;
     border: 1px solid #262626;
     border-radius: 12px;
-    padding: 18px;
-    margin-bottom: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
   }
-  .card h2 { font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-
-  label { display: block; font-size: 11px; color: #aaa; margin-bottom: 5px; margin-top: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card h2 { font-size: 16px; margin-bottom: 12px; }
+  label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; margin-top: 12px; font-weight: 500; }
   input, select, textarea {
     width: 100%;
     padding: 10px 12px;
@@ -43,8 +36,7 @@
     font-family: inherit;
   }
   input:focus, select:focus, textarea:focus { border-color: #FF6B35; outline: none; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .btn {
     background: #FF6B35;
     color: #fff;
@@ -54,162 +46,18 @@
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    margin-top: 14px;
-    width: 100%;
+    margin-top: 16px;
   }
-  .btn:hover { background: #ff5a1f; }
-  .btn-danger { background: #dc2626; padding: 6px 12px; font-size: 11px; margin-top: 0; width: auto; }
-  .btn-edit { background: #2563eb; padding: 6px 12px; font-size: 11px; margin-top: 0; width: auto; margin-right: 6px; }
+  .btn-danger { background: #dc2626; padding: 6px 12px; font-size: 11px; }
   .btn-secondary { background: #2a2a2a; }
-  .btn-ghost { background: transparent; border: 1px solid #333; color: #aaa; }
-  .btn-small { padding: 8px 12px; font-size: 12px; margin-top: 0; width: auto; }
-
-  .search-wrapper { position: relative; }
-  .search-results {
-    position: absolute;
-    top: 100%; left: 0; right: 0;
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    border-top: none;
-    border-radius: 0 0 8px 8px;
-    max-height: 280px;
-    overflow-y: auto;
-    z-index: 100;
-    display: none;
-  }
-  .search-results.show { display: block; }
-  .search-result {
-    padding: 10px 12px;
-    cursor: pointer;
-    border-bottom: 1px solid #232323;
-    font-size: 13px;
-  }
-  .search-result:hover { background: #2a2a2a; }
-  .search-result strong { display: block; margin-bottom: 2px; font-size: 13px; }
-  .search-result small { color: #888; font-size: 11px; }
-  .search-loading { padding: 12px; text-align: center; color: #666; font-size: 12px; }
-  .search-fallback {
-    padding: 10px 12px;
-    background: #2e1f0d;
-    border-top: 1px solid #facc1530;
-    font-size: 11px;
-    color: #fde68a;
-  }
-
-  .selected-place {
-    background: #1f2e1a;
-    border: 1px solid #2d4a23;
-    border-radius: 8px;
-    padding: 12px;
-    margin-top: 10px;
-    display: none;
-    font-size: 13px;
-  }
-  .selected-place.show { display: block; }
-  .selected-place .selected-header { color: #4ade80; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-  .selected-place .selected-header strong { font-size: 12px; }
-  .selected-place .selected-name { color: #fff; font-weight: 500; margin-bottom: 4px; }
-  .selected-place .selected-coords { color: #888; font-size: 11px; }
-
-  /* MINI MAPA DE AJUSTE FINO */
-  .mini-map-wrap {
-    margin-top: 10px;
-    border-radius: 8px;
-    overflow: hidden;
-    display: none;
-  }
-  .mini-map-wrap.show { display: block; }
-  #mini-map { height: 200px; }
-  .mini-map-hint {
-    background: #1a1a1a;
-    color: #aaa;
-    font-size: 11px;
-    padding: 8px 12px;
-    text-align: center;
-    border-top: 1px solid #2a2a2a;
-  }
-
-  .favorites { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .fav-chip {
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    border-radius: 100px;
-    padding: 6px 14px 6px 12px;
-    font-size: 12px;
-    cursor: pointer;
-    color: #ccc;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.15s;
-  }
-  .fav-chip:hover { border-color: #FF6B35; color: #fff; }
-  .fav-chip .star { color: #facc15; font-size: 11px; }
-  .fav-chip .remove {
-    color: #666; font-size: 14px; margin-left: 4px;
-    width: 16px; height: 16px; border-radius: 50%;
-    display: inline-flex; align-items: center; justify-content: center;
-  }
-  .fav-chip .remove:hover { background: #dc2626; color: #fff; }
-  .fav-empty { color: #666; font-size: 12px; font-style: italic; }
-
-  #mapa-admin {
-    height: 280px;
-    border-radius: 8px;
-    margin-top: 8px;
-    border: 1px solid #2a2a2a;
-    z-index: 1;
-  }
-  .map-hint { color: #888; font-size: 11px; margin-top: 6px; text-align: center; }
-
-  .tabs {
-    display: flex; gap: 4px;
-    background: #0d0d0d;
-    border: 1px solid #2a2a2a;
-    border-radius: 8px;
-    padding: 3px;
-    margin-top: 8px;
-  }
-  .tab {
-    flex: 1;
-    padding: 8px;
-    background: transparent;
-    border: none;
-    color: #888;
-    font-size: 12px;
-    cursor: pointer;
-    border-radius: 6px;
-    font-weight: 500;
-  }
-  .tab.active { background: #FF6B35; color: #fff; }
-
-  .tab-content { display: none; margin-top: 8px; }
-  .tab-content.active { display: block; }
-
   .event-row {
-    display: flex; justify-content: space-between; align-items: center; gap: 10px;
-    padding: 12px;
-    background: #0d0d0d;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    border: 1px solid #1f1f1f;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px; background: #0d0d0d; border-radius: 8px;
+    margin-bottom: 8px; border: 1px solid #1f1f1f;
   }
-  .event-info { font-size: 13px; flex: 1; min-width: 0; }
-  .event-info strong { display: block; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .event-info small { color: #888; font-size: 11px; }
-  .event-info .pill {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 100px;
-    font-size: 10px;
-    margin-right: 6px;
-    font-weight: 600;
-  }
-  .pill-baixa { background: #3a1414; color: #ef4444; }
-  .pill-media { background: #3a3014; color: #facc15; }
-  .pill-alta { background: #143a1f; color: #22c55e; }
-  .pill-estourado { background: #2e143a; color: #c084fc; }
-
+  .event-info { font-size: 13px; }
+  .event-info strong { display: block; margin-bottom: 2px; }
+  .event-info small { color: #888; }
   pre {
     background: #0d0d0d;
     padding: 12px;
@@ -218,10 +66,8 @@
     overflow-x: auto;
     font-size: 11px;
     color: #4ade80;
-    max-height: 250px;
-    line-height: 1.4;
+    max-height: 300px;
   }
-
   .help {
     background: #1f2e1a;
     border-left: 3px solid #4ade80;
@@ -230,146 +76,67 @@
     font-size: 12px;
     color: #aaffcc;
     margin-top: 12px;
-    line-height: 1.5;
-  }
-  .warning {
-    background: #2e1f0d;
-    border-left: 3px solid #facc15;
-    padding: 10px 14px;
-    border-radius: 4px;
-    font-size: 12px;
-    color: #fde68a;
-    margin-top: 12px;
-  }
-
-  .toast {
-    position: fixed; bottom: 20px; left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    background: #2a2a2a; border: 1px solid #444;
-    color: #fff; padding: 12px 22px; border-radius: 100px;
-    font-size: 13px; z-index: 9999;
-    transition: transform 0.3s;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    max-width: 90%;
-  }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.error { border-color: #dc2626; background: #2a1414; color: #fca5a5; }
-
-  .edit-banner {
-    background: #1e3a5f;
-    border: 1px solid #2563eb;
-    border-radius: 8px;
-    padding: 10px 14px;
-    margin-bottom: 12px;
-    font-size: 13px;
-    color: #93c5fd;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  .edit-banner.hidden { display: none; }
-
-  .actions-bar { display: flex; gap: 8px; }
-  .actions-bar .btn { flex: 1; }
-
-  @media (max-width: 600px) {
-    .row { grid-template-columns: 1fr; }
-    h1 { font-size: 18px; }
-    body { padding: 12px; }
   }
 </style>
 </head>
 <body>
-
 <div class="container">
-  <h1>🔥 Admin — Zona Quente RJ</h1>
-  <div class="subtitle">Cadastre eventos sem dor de cabeça</div>
+  <h1>🔥 Painel Admin — Zona Quente RJ</h1>
+  <div class="subtitle">Cadastre eventos e copie o JSON para colar no app</div>
 
-  <div class="edit-banner hidden" id="edit-banner">
-    <span>✏️ Editando: <strong id="edit-name"></strong></span>
-    <button class="btn-ghost" style="padding: 4px 10px; font-size: 11px; border-radius: 6px; cursor: pointer;" onclick="cancelarEdicao()">Cancelar</button>
-  </div>
-
+  <!-- FORMULÁRIO -->
   <div class="card">
     <h2>➕ Novo evento</h2>
-
     <label>Nome do evento *</label>
-    <input id="nome" placeholder="Ex: Show de Caetano no Vivo Rio">
-
-    <label>📍 Local *</label>
-    <div class="tabs">
-      <button class="tab active" data-tab="favoritos">⭐ Favoritos</button>
-      <button class="tab" data-tab="buscar">🔍 Buscar</button>
-      <button class="tab" data-tab="mapa">🗺️ Mapa</button>
-    </div>
-
-    <div class="tab-content active" id="tab-favoritos">
-      <div class="favorites" id="favoritos-list">
-        <span class="fav-empty">Nenhum favorito ainda.</span>
-      </div>
-      <button class="btn btn-secondary" onclick="abrirSalvarFavorito()" style="margin-top: 10px; font-size: 12px; padding: 8px;">+ Salvar local atual como favorito</button>
-    </div>
-
-    <div class="tab-content" id="tab-buscar">
-      <div class="search-wrapper">
-        <input id="busca" placeholder="Ex: Av. Bartolomeu Mitre 1314, Circo Voador, Maracanã...">
-        <div class="search-results" id="search-results"></div>
-      </div>
-      <div class="help" style="margin-top: 8px;">
-        💡 Pode digitar nome do lugar ou endereço com número. Se o número não for encontrado, aparecerá só a rua — depois você ajusta o ponto exato no mapa abaixo.
-      </div>
-    </div>
-
-    <div class="tab-content" id="tab-mapa">
-      <div id="mapa-admin"></div>
-      <div class="map-hint">👆 Clique no mapa para selecionar o local exato</div>
-    </div>
-
-    <!-- LOCAL SELECIONADO -->
-    <div class="selected-place" id="selected-place">
-      <div class="selected-header">
-        <strong>✅ LOCAL SELECIONADO</strong>
-        <button class="btn-ghost btn-small" onclick="toggleAjusteFino()" id="btn-ajustar" style="border-radius: 6px;">🎯 Ajustar no mapa</button>
-      </div>
-      <div class="selected-name" id="selected-name"></div>
-      <div class="selected-coords" id="selected-coords"></div>
-
-      <!-- Mini mapa de ajuste fino -->
-      <div class="mini-map-wrap" id="mini-map-wrap">
-        <div id="mini-map"></div>
-        <div class="mini-map-hint">🎯 Arraste o pino vermelho ou clique no local exato</div>
-      </div>
-
-      <!-- Editar nome do local -->
-      <div style="margin-top: 10px; display: flex; gap: 6px; align-items: center;">
-        <input id="edit-local-nome" placeholder="Editar nome do local..." style="flex: 1; padding: 6px 10px; font-size: 12px;">
-        <button class="btn-ghost btn-small" onclick="atualizarNomeLocal()" style="border-radius: 6px;">Renomear</button>
-      </div>
-    </div>
+    <input id="nome" placeholder="Ex: Show no Circo Voador">
 
     <div class="row">
       <div>
-        <label>Início *</label>
-        <input id="inicio" type="time" value="20:00">
+        <label>Local *</label>
+        <input id="local" placeholder="Ex: Lapa">
       </div>
-      <div>
-        <label>Fim *</label>
-        <input id="fim" type="time" value="02:00">
-      </div>
-    </div>
-
-    <div class="row">
       <div>
         <label>Tipo</label>
         <select id="tipo">
-          <option value="show">🎤 Show</option>
-          <option value="esporte">⚽ Esporte</option>
-          <option value="gastronomia">🍽️ Gastronomia</option>
-          <option value="corporativo">💼 Corporativo</option>
-          <option value="lazer">🏖️ Lazer</option>
-          <option value="outro">📍 Outro</option>
+          <option value="show">Show</option>
+          <option value="esporte">Esporte</option>
+          <option value="gastronomia">Gastronomia</option>
+          <option value="corporativo">Corporativo</option>
+          <option value="lazer">Lazer</option>
+          <option value="outro">Outro</option>
         </select>
       </div>
+    </div>
+
+    <div class="row">
       <div>
-        <label>Demanda</label>
+        <label>Latitude *</label>
+        <input id="lat" placeholder="-22.9133" type="number" step="any">
+      </div>
+      <div>
+        <label>Longitude *</label>
+        <input id="lng" placeholder="-43.1797" type="number" step="any">
+      </div>
+    </div>
+
+    <div class="help">
+      💡 Para pegar lat/lng: abra o Google Maps, clique com botão direito no local e copie as coordenadas.
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Início</label>
+        <input id="inicio" placeholder="22:00" type="time">
+      </div>
+      <div>
+        <label>Fim</label>
+        <input id="fim" placeholder="03:30" type="time">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Status / Demanda</label>
         <select id="status">
           <option value="baixa">🥶 Baixa</option>
           <option value="media" selected>😐 Média</option>
@@ -377,9 +144,6 @@
           <option value="estourado">🔥 Estourado</option>
         </select>
       </div>
-    </div>
-
-    <div class="row">
       <div>
         <label>Tipo de corrida</label>
         <select id="tipo_corrida">
@@ -388,374 +152,40 @@
           <option value="mista" selected>Mista</option>
         </select>
       </div>
-      <div>
-        <label>Público estimado</label>
-        <input id="publico" placeholder="~2.500">
-      </div>
     </div>
+
+    <label>Público estimado</label>
+    <input id="publico" placeholder="Ex: ~2.500">
 
     <label>Motivo / Observação</label>
     <textarea id="motivo" rows="2" placeholder="Ex: Show indie + casas de shows da Lapa lotadas"></textarea>
 
-    <button class="btn" onclick="salvarEvento()" id="btn-salvar">✅ Adicionar evento</button>
+    <button class="btn" onclick="adicionarEvento()">Adicionar evento</button>
   </div>
 
+  <!-- LISTA -->
   <div class="card">
     <h2>📋 Eventos cadastrados (<span id="count">0</span>)</h2>
     <div id="lista"></div>
   </div>
 
+  <!-- JSON GERADO -->
   <div class="card">
     <h2>📦 Código para colar no app</h2>
-    <p style="font-size: 12px; color: #888; margin-bottom: 8px;">
-      Copie esse bloco e cole no <code style="background:#0d0d0d; padding:2px 6px; border-radius:3px;">index.html</code> substituindo o array <code style="background:#0d0d0d; padding:2px 6px; border-radius:3px;">EVENTOS</code>.
+    <p style="font-size:12px; color:#888; margin-bottom:8px;">
+      Copie esse bloco e cole no <code>index.html</code> substituindo o array <code>EVENTOS</code>.
     </p>
     <pre id="json-output">const EVENTOS = [];</pre>
-    <div class="actions-bar">
-      <button class="btn btn-secondary" onclick="copiarJSON()">📋 Copiar código</button>
-      <button class="btn btn-ghost" onclick="exportarBackup()">💾 Backup</button>
-    </div>
-    <div class="warning">
-      ⚠️ Os eventos ficam salvos APENAS neste navegador. Para que apareçam pra todos os motoristas, você precisa copiar e colar no index.html.
-    </div>
+    <button class="btn btn-secondary" onclick="copiarJSON()">📋 Copiar JSON</button>
   </div>
-
 </div>
-
-<div class="toast" id="toast"></div>
 
 <script>
 let eventos = JSON.parse(localStorage.getItem('zq_eventos') || '[]');
-let favoritos = JSON.parse(localStorage.getItem('zq_favoritos') || '[]');
 let nextId = eventos.length > 0 ? Math.max(...eventos.map(e => e.id)) + 1 : 1;
-let editandoId = null;
-let localSelecionado = null;
-let mapaAdmin = null;
-let mapaMarker = null;
-let miniMap = null;
-let miniMapMarker = null;
-let buscaTimeout = null;
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-    if (tab.dataset.tab === 'mapa' && !mapaAdmin) {
-      setTimeout(initMapaAdmin, 100);
-    }
-  });
-});
-
-document.getElementById('busca').addEventListener('input', (e) => {
-  const q = e.target.value.trim();
-  const results = document.getElementById('search-results');
-  clearTimeout(buscaTimeout);
-  if (q.length < 3) {
-    results.classList.remove('show');
-    return;
-  }
-  results.innerHTML = '<div class="search-loading">🔍 Buscando...</div>';
-  results.classList.add('show');
-  buscaTimeout = setTimeout(() => buscarLocal(q), 400);
-});
-
-/* =================================================
-   BUSCA INTELIGENTE COM FALLBACK
-   1. Tenta com endereço completo (com número)
-   2. Se não achar, tenta sem o número (só rua)
-   3. Avisa o usuário que precisa ajustar no mapa
-   ================================================= */
-async function buscarLocal(query) {
-  const results = document.getElementById('search-results');
-  const viewbox = '-43.30,-22.85,-43.10,-23.05';
-
-  // Detecta se a query tem número
-  const temNumero = /\d{2,5}/.test(query);
-  let temNumeroOriginal = false;
-  let queryOriginal = query;
-
-  // Tentativa 1: query completa (com número se tiver)
-  let data = await tentarBusca(query, viewbox, true);
-
-  if (data.length === 0) {
-    data = await tentarBusca(query, null, false);
-  }
-
-  // Se tinha número e não achou, tenta sem o número
-  let buscadoSemNumero = false;
-  if (data.length === 0 && temNumero) {
-    const querySemNumero = query.replace(/\b\d{2,5}\b/g, '').trim().replace(/\s+/g, ' ').replace(/,\s*$/, '');
-    if (querySemNumero.length >= 3) {
-      data = await tentarBusca(querySemNumero, viewbox, true);
-      if (data.length === 0) {
-        data = await tentarBusca(querySemNumero, null, false);
-      }
-      if (data.length > 0) {
-        buscadoSemNumero = true;
-        queryOriginal = query; // mantém a busca original pra mostrar pro usuário
-      }
-    }
-  }
-
-  mostrarResultadosBusca(data, buscadoSemNumero, queryOriginal);
-}
-
-async function tentarBusca(query, viewbox, bounded) {
-  let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ', Rio de Janeiro')}&format=json&limit=8&addressdetails=1`;
-  if (viewbox && bounded) {
-    url += `&viewbox=${viewbox}&bounded=1`;
-  }
-  try {
-    const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
-    return await res.json();
-  } catch (err) {
-    return [];
-  }
-}
-
-function mostrarResultadosBusca(data, semNumero = false, queryOriginal = '') {
-  const results = document.getElementById('search-results');
-  if (data.length === 0) {
-    results.innerHTML = `
-      <div class="search-loading" style="color:#fca5a5;">
-        ❌ Nenhum resultado encontrado.
-      </div>
-      <div class="search-fallback">
-        💡 Tente: usar só o nome da rua (sem número), procurar por um ponto de referência próximo, ou usar a aba <strong>🗺️ Mapa</strong> para clicar no local exato.
-      </div>
-    `;
-    return;
-  }
-
-  let aviso = '';
-  if (semNumero) {
-    aviso = `
-      <div class="search-fallback">
-        ⚠️ O número específico não foi encontrado. Selecione a rua abaixo e depois <strong>ajuste o ponto exato no mapa</strong> (botão "Ajustar no mapa" aparece após selecionar).
-      </div>
-    `;
-  }
-
-  results.innerHTML = data.map((item, i) => {
-    const nome = item.display_name.split(',')[0];
-    const resto = item.display_name.split(',').slice(1, 4).join(',').trim();
-    return `
-      <div class="search-result" onclick='selecionarBusca(${i}, ${semNumero}, ${JSON.stringify(queryOriginal)})'>
-        <strong>${nome}</strong>
-        <small>${resto}</small>
-      </div>
-    `;
-  }).join('') + aviso;
-
-  window._searchData = data;
-}
-
-function selecionarBusca(i, semNumero, queryOriginal) {
-  const item = window._searchData[i];
-  let nome = item.display_name.split(',')[0];
-
-  // Se foi busca sem número, usa a query original (com número) como nome do local
-  if (semNumero && queryOriginal) {
-    nome = queryOriginal;
-  }
-
-  selecionarLocal(nome, parseFloat(item.lat), parseFloat(item.lon));
-  document.getElementById('search-results').classList.remove('show');
-  document.getElementById('busca').value = nome;
-
-  // Se foi busca sem número, abre automaticamente o ajuste fino
-  if (semNumero) {
-    setTimeout(() => {
-      if (!document.getElementById('mini-map-wrap').classList.contains('show')) {
-        toggleAjusteFino();
-      }
-      showToast('🎯 Ajuste o pino vermelho para o número exato!');
-    }, 300);
-  }
-}
-
-/* =================================================
-   MAPA PRINCIPAL (aba mapa)
-   ================================================= */
-function initMapaAdmin() {
-  mapaAdmin = L.map('mapa-admin').setView([-22.97, -43.19], 13);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, subdomains: 'abcd', attribution: ''
-  }).addTo(mapaAdmin);
-  mapaAdmin.on('click', async (e) => {
-    const { lat, lng } = e.latlng;
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
-      const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
-      const data = await res.json();
-      const nome = data.display_name ? data.display_name.split(',').slice(0, 2).join(', ') : 'Local marcado no mapa';
-      selecionarLocal(nome, lat, lng);
-    } catch (err) {
-      selecionarLocal('Local marcado no mapa', lat, lng);
-    }
-  });
-  if (localSelecionado) atualizarMarkerMapa();
-}
-
-function atualizarMarkerMapa() {
-  if (!mapaAdmin || !localSelecionado) return;
-  if (mapaMarker) mapaAdmin.removeLayer(mapaMarker);
-  mapaMarker = L.marker([localSelecionado.lat, localSelecionado.lng]).addTo(mapaAdmin);
-  mapaAdmin.setView([localSelecionado.lat, localSelecionado.lng], 15);
-}
-
-/* =================================================
-   MINI MAPA - AJUSTE FINO
-   ================================================= */
-function toggleAjusteFino() {
-  const wrap = document.getElementById('mini-map-wrap');
-  const btn = document.getElementById('btn-ajustar');
-
-  if (wrap.classList.contains('show')) {
-    wrap.classList.remove('show');
-    btn.textContent = '🎯 Ajustar no mapa';
-  } else {
-    if (!localSelecionado) {
-      showToast('Selecione um local primeiro', true);
-      return;
-    }
-    wrap.classList.add('show');
-    btn.textContent = '✕ Fechar mapa';
-    setTimeout(() => initMiniMap(), 100);
-  }
-}
-
-function initMiniMap() {
-  if (!localSelecionado) return;
-
-  if (miniMap) {
-    miniMap.remove();
-    miniMap = null;
-  }
-
-  miniMap = L.map('mini-map').setView([localSelecionado.lat, localSelecionado.lng], 17);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, subdomains: 'abcd', attribution: ''
-  }).addTo(miniMap);
-
-  // Pino arrastável vermelho
-  const redIcon = L.divIcon({
-    className: 'mini-marker',
-    html: '<div style="position:relative;"><div style="position:absolute;inset:-8px;border-radius:50%;background:#ef4444;opacity:0.3;animation:pulse 1.5s infinite;"></div><div style="position:relative;width:24px;height:24px;border-radius:50%;background:#ef4444;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.6);"></div></div>',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12]
-  });
-
-  miniMapMarker = L.marker([localSelecionado.lat, localSelecionado.lng], {
-    icon: redIcon,
-    draggable: true
-  }).addTo(miniMap);
-
-  // Quando arrastar, atualiza o local
-  miniMapMarker.on('dragend', (e) => {
-    const pos = e.target.getLatLng();
-    atualizarCoordenadasLocal(pos.lat, pos.lng);
-  });
-
-  // Click no mapa também move o pino
-  miniMap.on('click', (e) => {
-    miniMapMarker.setLatLng(e.latlng);
-    atualizarCoordenadasLocal(e.latlng.lat, e.latlng.lng);
-  });
-}
-
-function atualizarCoordenadasLocal(lat, lng) {
-  if (!localSelecionado) return;
-  localSelecionado.lat = lat;
-  localSelecionado.lng = lng;
-  document.getElementById('selected-coords').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)} (ajustado ✓)`;
-  if (mapaAdmin) atualizarMarkerMapa();
-}
-
-function atualizarNomeLocal() {
-  const novoNome = document.getElementById('edit-local-nome').value.trim();
-  if (!novoNome) {
-    showToast('Digite o novo nome', true);
-    return;
-  }
-  if (!localSelecionado) {
-    showToast('Selecione um local primeiro', true);
-    return;
-  }
-  localSelecionado.nome = novoNome;
-  document.getElementById('selected-name').textContent = novoNome;
-  document.getElementById('edit-local-nome').value = '';
-  showToast('✏️ Nome atualizado!');
-}
-
-/* =================================================
-   SELECIONAR LOCAL (núcleo)
-   ================================================= */
-function selecionarLocal(nome, lat, lng) {
-  localSelecionado = { nome, lat, lng };
-  document.getElementById('selected-name').textContent = nome;
-  document.getElementById('selected-coords').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-  document.getElementById('selected-place').classList.add('show');
-  document.getElementById('edit-local-nome').value = '';
-
-  // Fecha o mini mapa se estava aberto (refresh quando reabrir)
-  document.getElementById('mini-map-wrap').classList.remove('show');
-  document.getElementById('btn-ajustar').textContent = '🎯 Ajustar no mapa';
-
-  if (mapaAdmin) atualizarMarkerMapa();
-}
-
-/* =================================================
-   FAVORITOS
-   ================================================= */
-function renderFavoritos() {
-  const list = document.getElementById('favoritos-list');
-  if (favoritos.length === 0) {
-    list.innerHTML = '<span class="fav-empty">Nenhum favorito ainda.</span>';
-    return;
-  }
-  list.innerHTML = favoritos.map((f, i) => `
-    <div class="fav-chip">
-      <span class="star">⭐</span>
-      <span onclick="usarFavorito(${i})">${f.nome}</span>
-      <span class="remove" onclick="removerFavorito(${i})" title="Remover">×</span>
-    </div>
-  `).join('');
-}
-
-function usarFavorito(i) {
-  const f = favoritos[i];
-  selecionarLocal(f.nome, f.lat, f.lng);
-  showToast('⭐ "' + f.nome + '" selecionado');
-}
-
-function removerFavorito(i) {
-  if (!confirm('Remover esse favorito?')) return;
-  favoritos.splice(i, 1);
-  localStorage.setItem('zq_favoritos', JSON.stringify(favoritos));
-  renderFavoritos();
-}
-
-function abrirSalvarFavorito() {
-  if (!localSelecionado) {
-    showToast('Selecione um local primeiro (busque ou clique no mapa)', true);
-    return;
-  }
-  const nome = prompt('Nome curto pra esse favorito:', localSelecionado.nome);
-  if (!nome) return;
-  favoritos.push({ nome, lat: localSelecionado.lat, lng: localSelecionado.lng });
-  localStorage.setItem('zq_favoritos', JSON.stringify(favoritos));
-  renderFavoritos();
-  showToast('⭐ Favorito salvo!');
-}
-
-/* =================================================
-   SALVAR EVENTO
-   ================================================= */
 function inferirFiltros(inicio, fim) {
-  const filtros = ['agora'];
+  const filtros = ['agora']; // simplificação para o admin
   if (inicio) {
     const h = parseInt(inicio.split(':')[0]);
     if (h >= 18 || h <= 4) filtros.push('noite');
@@ -764,72 +194,39 @@ function inferirFiltros(inicio, fim) {
   return filtros;
 }
 
-function salvarEvento() {
+function adicionarEvento() {
   const nome = document.getElementById('nome').value.trim();
-  if (!nome) {
-    showToast('Digite o nome do evento', true);
+  const local = document.getElementById('local').value.trim();
+  const lat = parseFloat(document.getElementById('lat').value);
+  const lng = parseFloat(document.getElementById('lng').value);
+
+  if (!nome || !local || isNaN(lat) || isNaN(lng)) {
+    alert('Preencha nome, local e coordenadas!');
     return;
   }
-  if (!localSelecionado) {
-    showToast('Selecione o local (favoritos, busca ou mapa)', true);
-    return;
-  }
-  const inicio = document.getElementById('inicio').value || '20:00';
-  const fim = document.getElementById('fim').value || '02:00';
-  const dadosEvento = {
+
+  const inicio = document.getElementById('inicio').value;
+  const fim = document.getElementById('fim').value;
+
+  const novo = {
+    id: nextId++,
     nome,
-    local: localSelecionado.nome,
+    local,
     tipo: document.getElementById('tipo').value,
-    lat: localSelecionado.lat,
-    lng: localSelecionado.lng,
+    lat, lng,
     status: document.getElementById('status').value,
-    inicio,
-    fim,
+    inicio: inicio || '00:00',
+    fim: fim || '23:59',
     publico: document.getElementById('publico').value || 'sem dado',
     motivo: document.getElementById('motivo').value || 'Sem descrição',
     tipo_corrida: document.getElementById('tipo_corrida').value,
     filtros: inferirFiltros(inicio, fim)
   };
-  if (editandoId !== null) {
-    const idx = eventos.findIndex(e => e.id === editandoId);
-    if (idx !== -1) {
-      eventos[idx] = { id: editandoId, ...dadosEvento };
-      showToast('✅ Evento atualizado!');
-    }
-    cancelarEdicao();
-  } else {
-    eventos.push({ id: nextId++, ...dadosEvento });
-    showToast('✅ Evento adicionado!');
-  }
+
+  eventos.push(novo);
   salvar();
   limparForm();
   render();
-}
-
-function editarEvento(id) {
-  const ev = eventos.find(e => e.id === id);
-  if (!ev) return;
-  editandoId = id;
-  document.getElementById('edit-banner').classList.remove('hidden');
-  document.getElementById('edit-name').textContent = ev.nome;
-  document.getElementById('nome').value = ev.nome;
-  document.getElementById('inicio').value = ev.inicio;
-  document.getElementById('fim').value = ev.fim;
-  document.getElementById('tipo').value = ev.tipo;
-  document.getElementById('status').value = ev.status;
-  document.getElementById('tipo_corrida').value = ev.tipo_corrida;
-  document.getElementById('publico').value = ev.publico === 'sem dado' ? '' : ev.publico;
-  document.getElementById('motivo').value = ev.motivo === 'Sem descrição' ? '' : ev.motivo;
-  selecionarLocal(ev.local, ev.lat, ev.lng);
-  document.getElementById('btn-salvar').textContent = '💾 Salvar alterações';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function cancelarEdicao() {
-  editandoId = null;
-  document.getElementById('edit-banner').classList.add('hidden');
-  document.getElementById('btn-salvar').textContent = '✅ Adicionar evento';
-  limparForm();
 }
 
 function removerEvento(id) {
@@ -837,7 +234,6 @@ function removerEvento(id) {
   eventos = eventos.filter(e => e.id !== id);
   salvar();
   render();
-  showToast('Evento removido');
 }
 
 function salvar() {
@@ -845,106 +241,37 @@ function salvar() {
 }
 
 function limparForm() {
-  document.getElementById('nome').value = '';
-  document.getElementById('publico').value = '';
-  document.getElementById('motivo').value = '';
-  document.getElementById('busca').value = '';
-  document.getElementById('inicio').value = '20:00';
-  document.getElementById('fim').value = '02:00';
-  document.getElementById('status').value = 'media';
-  document.getElementById('tipo').value = 'show';
-  document.getElementById('tipo_corrida').value = 'mista';
-  localSelecionado = null;
-  document.getElementById('selected-place').classList.remove('show');
-  document.getElementById('mini-map-wrap').classList.remove('show');
-  document.getElementById('btn-ajustar').textContent = '🎯 Ajustar no mapa';
-  if (mapaMarker && mapaAdmin) mapaAdmin.removeLayer(mapaMarker);
-  if (miniMap) { miniMap.remove(); miniMap = null; }
+  ['nome','local','lat','lng','inicio','fim','publico','motivo'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
 }
 
 function render() {
   document.getElementById('count').textContent = eventos.length;
   const lista = document.getElementById('lista');
   if (eventos.length === 0) {
-    lista.innerHTML = '<p style="color:#666; font-size:13px; padding: 20px 0; text-align:center;">Nenhum evento cadastrado.<br>Adicione o primeiro acima!</p>';
+    lista.innerHTML = '<p style="color:#666; font-size:13px; padding:8px 0;">Nenhum evento cadastrado.</p>';
   } else {
     lista.innerHTML = eventos.map(ev => `
       <div class="event-row">
         <div class="event-info">
           <strong>${ev.nome}</strong>
-          <small>
-            <span class="pill pill-${ev.status}">${ev.status}</span>
-            📍 ${ev.local} · ⏰ ${ev.inicio}–${ev.fim}
-          </small>
+          <small>📍 ${ev.local} · ⏰ ${ev.inicio}–${ev.fim} · ${ev.status}</small>
         </div>
-        <div>
-          <button class="btn btn-edit" onclick="editarEvento(${ev.id})">Editar</button>
-          <button class="btn btn-danger" onclick="removerEvento(${ev.id})">Remover</button>
-        </div>
+        <button class="btn btn-danger" onclick="removerEvento(${ev.id})">Remover</button>
       </div>
     `).join('');
   }
+  // Atualiza JSON
   document.getElementById('json-output').textContent = 'const EVENTOS = ' + JSON.stringify(eventos, null, 2) + ';';
 }
 
 function copiarJSON() {
   const txt = document.getElementById('json-output').textContent;
-  navigator.clipboard.writeText(txt).then(() => {
-    showToast('📋 Código copiado! Cole no index.html.');
-  }).catch(() => {
-    showToast('Erro ao copiar. Selecione manualmente.', true);
-  });
+  navigator.clipboard.writeText(txt).then(() => alert('Copiado! Cole no index.html substituindo o array EVENTOS.'));
 }
 
-function exportarBackup() {
-  const backup = { eventos, favoritos, exportadoEm: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `zona-quente-rj-backup-${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('💾 Backup baixado!');
-}
-
-let toastTimer;
-function showToast(msg, isError = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.toggle('error', isError);
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
-}
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.search-wrapper')) {
-    document.getElementById('search-results').classList.remove('show');
-  }
-});
-
-// Animação do pulse no pino vermelho
-const styleEl = document.createElement('style');
-styleEl.textContent = '@keyframes pulse { 0% { transform: scale(0.8); opacity: 0.6; } 100% { transform: scale(2.4); opacity: 0; } } .mini-marker { background: transparent !important; border: none !important; }';
-document.head.appendChild(styleEl);
-
-if (favoritos.length === 0) {
-  favoritos = [
-    { nome: 'Circo Voador', lat: -22.9133, lng: -43.1797 },
-    { nome: 'Vivo Rio', lat: -22.9272, lng: -43.1729 },
-    { nome: 'Lapa', lat: -22.9133, lng: -43.1797 },
-    { nome: 'Maracanã', lat: -22.9122, lng: -43.2302 },
-    { nome: 'Copacabana Palace', lat: -22.9676, lng: -43.1779 },
-    { nome: 'Lagoa - Parque dos Patins', lat: -22.9711, lng: -43.2096 },
-    { nome: 'Botafogo - Bares', lat: -22.9520, lng: -43.1843 }
-  ];
-  localStorage.setItem('zq_favoritos', JSON.stringify(favoritos));
-}
-
-renderFavoritos();
 render();
 </script>
-
 </body>
 </html>
