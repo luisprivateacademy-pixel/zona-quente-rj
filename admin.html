@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin · Zona Quente RJ</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0d0d;
+    color: #fff;
+    padding: 20px;
+    line-height: 1.5;
+  }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 24px; }
+  .card {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 16px; margin-bottom: 12px; }
+  label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; margin-top: 12px; font-weight: 500; }
+  input, select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: #0d0d0d;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #FF6B35; outline: none; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .btn {
+    background: #FF6B35;
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 16px;
+  }
+  .btn-danger { background: #dc2626; padding: 6px 12px; font-size: 11px; }
+  .btn-secondary { background: #2a2a2a; }
+  .event-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px; background: #0d0d0d; border-radius: 8px;
+    margin-bottom: 8px; border: 1px solid #1f1f1f;
+  }
+  .event-info { font-size: 13px; }
+  .event-info strong { display: block; margin-bottom: 2px; }
+  .event-info small { color: #888; }
+  pre {
+    background: #0d0d0d;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #2a2a2a;
+    overflow-x: auto;
+    font-size: 11px;
+    color: #4ade80;
+    max-height: 300px;
+  }
+  .help {
+    background: #1f2e1a;
+    border-left: 3px solid #4ade80;
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #aaffcc;
+    margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔥 Painel Admin — Zona Quente RJ</h1>
+  <div class="subtitle">Cadastre eventos e copie o JSON para colar no app</div>
+
+  <!-- FORMULÁRIO -->
+  <div class="card">
+    <h2>➕ Novo evento</h2>
+    <label>Nome do evento *</label>
+    <input id="nome" placeholder="Ex: Show no Circo Voador">
+
+    <div class="row">
+      <div>
+        <label>Local *</label>
+        <input id="local" placeholder="Ex: Lapa">
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select id="tipo">
+          <option value="show">Show</option>
+          <option value="esporte">Esporte</option>
+          <option value="gastronomia">Gastronomia</option>
+          <option value="corporativo">Corporativo</option>
+          <option value="lazer">Lazer</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Latitude *</label>
+        <input id="lat" placeholder="-22.9133" type="number" step="any">
+      </div>
+      <div>
+        <label>Longitude *</label>
+        <input id="lng" placeholder="-43.1797" type="number" step="any">
+      </div>
+    </div>
+
+    <div class="help">
+      💡 Para pegar lat/lng: abra o Google Maps, clique com botão direito no local e copie as coordenadas.
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Início</label>
+        <input id="inicio" placeholder="22:00" type="time">
+      </div>
+      <div>
+        <label>Fim</label>
+        <input id="fim" placeholder="03:30" type="time">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Status / Demanda</label>
+        <select id="status">
+          <option value="baixa">🥶 Baixa</option>
+          <option value="media" selected>😐 Média</option>
+          <option value="alta">🙂 Alta</option>
+          <option value="estourado">🔥 Estourado</option>
+        </select>
+      </div>
+      <div>
+        <label>Tipo de corrida</label>
+        <select id="tipo_corrida">
+          <option value="curta">Curta</option>
+          <option value="longa">Longa</option>
+          <option value="mista" selected>Mista</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Público estimado</label>
+    <input id="publico" placeholder="Ex: ~2.500">
+
+    <label>Motivo / Observação</label>
+    <textarea id="motivo" rows="2" placeholder="Ex: Show indie + casas de shows da Lapa lotadas"></textarea>
+
+    <button class="btn" onclick="adicionarEvento()">Adicionar evento</button>
+  </div>
+
+  <!-- LISTA -->
+  <div class="card">
+    <h2>📋 Eventos cadastrados (<span id="count">0</span>)</h2>
+    <div id="lista"></div>
+  </div>
+
+  <!-- JSON GERADO -->
+  <div class="card">
+    <h2>📦 Código para colar no app</h2>
+    <p style="font-size:12px; color:#888; margin-bottom:8px;">
+      Copie esse bloco e cole no <code>index.html</code> substituindo o array <code>EVENTOS</code>.
+    </p>
+    <pre id="json-output">const EVENTOS = [];</pre>
+    <button class="btn btn-secondary" onclick="copiarJSON()">📋 Copiar JSON</button>
+  </div>
+</div>
+
+<script>
+let eventos = JSON.parse(localStorage.getItem('zq_eventos') || '[]');
+let nextId = eventos.length > 0 ? Math.max(...eventos.map(e => e.id)) + 1 : 1;
+
+function inferirFiltros(inicio, fim) {
+  const filtros = ['agora']; // simplificação para o admin
+  if (inicio) {
+    const h = parseInt(inicio.split(':')[0]);
+    if (h >= 18 || h <= 4) filtros.push('noite');
+    if (h >= 6) filtros.push('proximas');
+  }
+  return filtros;
+}
+
+function adicionarEvento() {
+  const nome = document.getElementById('nome').value.trim();
+  const local = document.getElementById('local').value.trim();
+  const lat = parseFloat(document.getElementById('lat').value);
+  const lng = parseFloat(document.getElementById('lng').value);
+
+  if (!nome || !local || isNaN(lat) || isNaN(lng)) {
+    alert('Preencha nome, local e coordenadas!');
+    return;
+  }
+
+  const inicio = document.getElementById('inicio').value;
+  const fim = document.getElementById('fim').value;
+
+  const novo = {
+    id: nextId++,
+    nome,
+    local,
+    tipo: document.getElementById('tipo').value,
+    lat, lng,
+    status: document.getElementById('status').value,
+    inicio: inicio || '00:00',
+    fim: fim || '23:59',
+    publico: document.getElementById('publico').value || 'sem dado',
+    motivo: document.getElementById('motivo').value || 'Sem descrição',
+    tipo_corrida: document.getElementById('tipo_corrida').value,
+    filtros: inferirFiltros(inicio, fim)
+  };
+
+  eventos.push(novo);
+  salvar();
+  limparForm();
+  render();
+}
+
+function removerEvento(id) {
+  if (!confirm('Remover esse evento?')) return;
+  eventos = eventos.filter(e => e.id !== id);
+  salvar();
+  render();
+}
+
+function salvar() {
+  localStorage.setItem('zq_eventos', JSON.stringify(eventos));
+}
+
+function limparForm() {
+  ['nome','local','lat','lng','inicio','fim','publico','motivo'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+}
+
+function render() {
+  document.getElementById('count').textContent = eventos.length;
+  const lista = document.getElementById('lista');
+  if (eventos.length === 0) {
+    lista.innerHTML = '<p style="color:#666; font-size:13px; padding:8px 0;">Nenhum evento cadastrado.</p>';
+  } else {
+    lista.innerHTML = eventos.map(ev => `
+      <div class="event-row">
+        <div class="event-info">
+          <strong>${ev.nome}</strong>
+          <small>📍 ${ev.local} · ⏰ ${ev.inicio}–${ev.fim} · ${ev.status}</small>
+        </div>
+        <button class="btn btn-danger" onclick="removerEvento(${ev.id})">Remover</button>
+      </div>
+    `).join('');
+  }
+  // Atualiza JSON
+  document.getElementById('json-output').textContent = 'const EVENTOS = ' + JSON.stringify(eventos, null, 2) + ';';
+}
+
+function copiarJSON() {
+  const txt = document.getElementById('json-output').textContent;
+  navigator.clipboard.writeText(txt).then(() => alert('Copiado! Cole no index.html substituindo o array EVENTOS.'));
+}
+
+render();
+</script>
+</body>
+</html>

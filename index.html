@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d0d0d">
+<meta name="description" content="Zona Quente RJ - Mapa em tempo real para motoristas de aplicativo no Rio de Janeiro. Veja onde estão os eventos e as melhores regiões para corridas.">
+<title>Zona Quente RJ — Mapa para motoristas</title>
+
+<!-- PWA: permite "instalar" o site como app no celular -->
+<link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlpvbmEgUXVlbnRlIFJKIiwKICAic2hvcnRfbmFtZSI6ICJab25hUXVlbnRlIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwZDBkMGQiLAogICJ0aGVtZV9jb2xvciI6ICIjMGQwZDBkIgp9">
+
+<!-- Leaflet: biblioteca de mapas gratuita (alternativa ao Google Maps) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+  /* === RESET === */
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0d0d;
+    color: #fff;
+    overscroll-behavior: none;
+  }
+
+  /* === HEADER === */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #141414;
+    border-bottom: 1px solid #262626;
+    z-index: 1000;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #FF6B35, #ff4500);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .logo-text { font-size: 16px; font-weight: 600; line-height: 1; }
+  .logo-sub { font-size: 11px; color: #888; margin-top: 2px; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
+    background: #1f2e1a;
+    border-radius: 100px;
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #4ade80;
+    animation: livePulse 1.5s infinite;
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .live-text { color: #4ade80; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
+
+  /* === FILTROS === */
+  .filters {
+    display: flex; gap: 6px;
+    padding: 10px 16px;
+    background: #141414;
+    border-bottom: 1px solid #262626;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .filter-btn {
+    white-space: nowrap;
+    padding: 7px 14px;
+    background: transparent;
+    color: #aaa;
+    border: 1px solid #333;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn.active {
+    background: #FF6B35;
+    color: #fff;
+    border-color: #FF6B35;
+  }
+
+  /* === MAPA === */
+  .map-container { position: relative; flex: 1; min-height: 0; }
+  #map { height: 100%; width: 100%; background: #1a1a1a; }
+  .leaflet-control-attribution { display: none; }
+  .leaflet-control-zoom a {
+    background: rgba(20,20,20,0.95) !important;
+    color: #fff !important;
+    border: 1px solid #333 !important;
+  }
+
+  /* === LEGENDA === */
+  .legend {
+    position: absolute; bottom: 16px; left: 16px;
+    background: rgba(20,20,20,0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #262626;
+    z-index: 500;
+  }
+  .legend-title { color: #888; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #ddd; padding: 2px 0; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* === STATS FLUTUANTE === */
+  .stats {
+    position: absolute; top: 16px; right: 16px;
+    background: rgba(20,20,20,0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #262626;
+    z-index: 500;
+  }
+  .stats-label { color: #888; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; }
+  .stats-num { color: #fff; font-size: 22px; font-weight: 600; line-height: 1.1; margin-top: 2px; }
+
+  /* === MARCADORES === */
+  .zq-marker { background: transparent !important; border: none !important; }
+  .marker-pulse {
+    position: absolute; inset: -10px;
+    border-radius: 50%;
+    animation: markerPulse 1.6s infinite;
+  }
+  .marker-dot {
+    position: relative;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 2.5px solid #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.7);
+  }
+  @keyframes markerPulse {
+    0% { transform: scale(0.7); opacity: 0.7; }
+    100% { transform: scale(2.4); opacity: 0; }
+  }
+
+  /* === BOTTOM SHEET (CARD DO EVENTO) === */
+  .sheet {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #141414;
+    border-top: 1px solid #262626;
+    border-radius: 16px 16px 0 0;
+    z-index: 1000;
+    transform: translateY(calc(100% - 56px));
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .sheet.expanded { transform: translateY(0); }
+  .sheet-handle {
+    width: 40px; height: 4px;
+    background: #444;
+    border-radius: 100px;
+    margin: 8px auto;
+    flex-shrink: 0;
+  }
+  .sheet-empty {
+    padding: 8px 16px 16px;
+    text-align: center;
+    color: #666;
+    font-size: 13px;
+  }
+  .sheet-empty .ti { font-size: 18px; vertical-align: -3px; margin-right: 4px; }
+  .sheet-content {
+    padding: 8px 16px 100px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .sheet-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .sheet-title { font-size: 17px; font-weight: 600; line-height: 1.25; }
+  .sheet-loc { color: #888; font-size: 12px; margin-top: 3px; }
+  .sheet-status {
+    padding: 5px 12px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .sheet-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .sheet-card {
+    background: #1a1a1a;
+    padding: 10px;
+    border-radius: 8px;
+  }
+  .sheet-card-label { color: #666; font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .sheet-card-value { color: #fff; font-size: 13px; font-weight: 600; margin-top: 3px; text-transform: capitalize; }
+  .sheet-reason {
+    background: #1a1a1a;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-top: 10px;
+    border-left: 3px solid;
+  }
+  .sheet-reason-label { color: #666; font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .sheet-reason-text { color: #ddd; font-size: 12px; margin-top: 3px; line-height: 1.4; }
+  .sheet-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-primary {
+    flex: 1;
+    padding: 12px;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn-secondary {
+    width: 48px;
+    background: #1a1a1a;
+    color: #fff;
+    border: 1px solid #333;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  /* === FEEDBACK BUTTONS === */
+  .feedback-section { margin-top: 14px; }
+  .feedback-title { color: #888; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-bottom: 8px; }
+  .feedback-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .feedback-btn {
+    padding: 10px 4px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #ccc;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .feedback-btn:active { transform: scale(0.95); }
+  .feedback-btn .emoji { font-size: 16px; }
+  .feedback-btn:hover { border-color: #555; }
+
+  /* === BOTTOM NAV === */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+    background: #141414;
+    border-top: 1px solid #262626;
+    z-index: 999;
+  }
+  .nav-btn {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 10px;
+    padding: 6px 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    flex: 1;
+    font-weight: 500;
+  }
+  .nav-btn .icon { font-size: 20px; }
+  .nav-btn.active { color: #FF6B35; }
+
+  /* === LISTA DE EVENTOS (TELA) === */
+  .events-list {
+    position: fixed;
+    inset: 0;
+    background: #0d0d0d;
+    z-index: 1100;
+    display: none;
+    flex-direction: column;
+  }
+  .events-list.show { display: flex; }
+  .events-list-header {
+    padding: 16px;
+    border-bottom: 1px solid #262626;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .back-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+  }
+  .events-list-title { font-size: 18px; font-weight: 600; }
+  .events-list-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px 100px;
+  }
+  .event-card {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+  .event-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .event-card-title { font-size: 14px; font-weight: 600; line-height: 1.3; }
+  .event-card-loc { color: #888; font-size: 11px; margin-top: 3px; }
+  .event-card-meta { display: flex; gap: 12px; font-size: 11px; color: #aaa; margin-top: 8px; }
+
+  /* === TOAST === */
+  .toast {
+    position: fixed;
+    bottom: 90px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #2a2a2a;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 100px;
+    font-size: 13px;
+    z-index: 2000;
+    transition: transform 0.3s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    border: 1px solid #444;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* === APP LAYOUT === */
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🔥</div>
+      <div>
+        <div class="logo-text">Zona Quente RJ</div>
+        <div class="logo-sub">Zona Sul · ao vivo</div>
+      </div>
+    </div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      <span class="live-text">AO VIVO</span>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filters">
+    <button class="filter-btn active" data-filter="agora">⚡ Acontecendo agora</button>
+    <button class="filter-btn" data-filter="proximas">⏰ Próximas horas</button>
+    <button class="filter-btn" data-filter="noite">🌙 Noite</button>
+    <button class="filter-btn" data-filter="todos">Todos</button>
+  </div>
+
+  <!-- MAPA -->
+  <div class="map-container">
+    <div id="map"></div>
+
+    <div class="legend">
+      <div class="legend-title">Demanda</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Baixa</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#facc15"></div>Média</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Alta</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>Estourado</div>
+    </div>
+
+    <div class="stats">
+      <div class="stats-label">Eventos visíveis</div>
+      <div class="stats-num" id="event-count">0</div>
+    </div>
+  </div>
+
+  <!-- BOTTOM SHEET (card do evento) -->
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div id="sheet-empty" class="sheet-empty">
+      📍 Toque em um evento no mapa para ver detalhes
+    </div>
+    <div id="sheet-content" class="sheet-content" style="display: none;"></div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav-map">
+      <span class="icon">🗺️</span>
+      Mapa
+    </button>
+    <button class="nav-btn" id="nav-events">
+      <span class="icon">📅</span>
+      Eventos
+    </button>
+    <button class="nav-btn" id="nav-hot">
+      <span class="icon">🔥</span>
+      Quentes
+    </button>
+    <button class="nav-btn" id="nav-info">
+      <span class="icon">ℹ️</span>
+      Sobre
+    </button>
+  </div>
+
+  <!-- LISTA DE EVENTOS (tela cheia) -->
+  <div class="events-list" id="events-list">
+    <div class="events-list-header">
+      <button class="back-btn" id="events-back">←</button>
+      <div class="events-list-title">Eventos de hoje</div>
+    </div>
+    <div class="events-list-content" id="events-list-content"></div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+</div>
+
+<script>
+/* =========================================================================
+   ZONA QUENTE RJ — MVP v1
+   --------------------------------------------------------------------------
+   Esse arquivo é todo o app. Para colocar no ar:
+   1. Suba esse arquivo no Vercel/Netlify/GitHub Pages
+   2. Pronto, funciona em qualquer celular
+   --------------------------------------------------------------------------
+   COMO ATUALIZAR EVENTOS: edite o array EVENTOS abaixo e re-upload o arquivo.
+   Quando tivermos backend, esse array vai vir de uma API.
+   ========================================================================= */
+
+/* ===== DADOS MOCKADOS (vai virar API depois) ===== */
+const EVENTOS = [
+  {
+    id: 1,
+    nome: 'Show no Circo Voador',
+    local: 'Lapa',
+    tipo: 'show',
+    lat: -22.9133,
+    lng: -43.1797,
+    status: 'estourado',
+    inicio: '22:00',
+    fim: '03:30',
+    publico: '~2.500',
+    motivo: 'Show indie + casas de shows da Lapa lotadas',
+    tipo_corrida: 'mista',
+    filtros: ['agora', 'noite']
+  },
+  {
+    id: 2,
+    nome: 'Pré-jogo Flamengo x Vasco',
+    local: 'Saída Maracanã (rota Botafogo)',
+    tipo: 'esporte',
+    lat: -22.9519,
+    lng: -43.1810,
+    status: 'alta',
+    inicio: '19:30',
+    fim: '23:30',
+    publico: '~60.000',
+    motivo: 'Saída do estádio com fluxo forte para Zona Sul',
+    tipo_corrida: 'longa',
+    filtros: ['agora', 'noite']
+  },
+  {
+    id: 3,
+    nome: 'Restaurantes em Ipanema',
+    local: 'Rua Garcia D\'Ávila',
+    tipo: 'gastronomia',
+    lat: -22.9836,
+    lng: -43.2065,
+    status: 'alta',
+    inicio: '20:00',
+    fim: '01:00',
+    publico: 'fluxo constante',
+    motivo: 'Sexta-feira movimentada, jantares e baladas',
+    tipo_corrida: 'curta',
+    filtros: ['agora', 'noite']
+  },
+  {
+    id: 4,
+    nome: 'Evento no Copacabana Palace',
+    local: 'Av. Atlântica',
+    tipo: 'corporativo',
+    lat: -22.9676,
+    lng: -43.1779,
+    status: 'media',
+    inicio: '21:00',
+    fim: '00:00',
+    publico: '~400 convidados',
+    motivo: 'Evento corporativo, saída prevista para meia-noite',
+    tipo_corrida: 'longa',
+    filtros: ['agora', 'noite']
+  },
+  {
+    id: 5,
+    nome: 'Bares de Botafogo',
+    local: 'Rua Voluntários da Pátria',
+    tipo: 'gastronomia',
+    lat: -22.9520,
+    lng: -43.1843,
+    status: 'alta',
+    inicio: '19:00',
+    fim: '02:00',
+    publico: 'fluxo alto',
+    motivo: 'Hub de bares, pico em sextas e sábados',
+    tipo_corrida: 'curta',
+    filtros: ['agora', 'noite']
+  },
+  {
+    id: 6,
+    nome: 'Praia Lounge - Leblon',
+    local: 'Posto 12',
+    tipo: 'lazer',
+    lat: -22.9869,
+    lng: -43.2233,
+    status: 'baixa',
+    inicio: '17:00',
+    fim: '21:00',
+    publico: '~150',
+    motivo: 'Fim de praia, dispersão lenta',
+    tipo_corrida: 'curta',
+    filtros: ['agora']
+  },
+  {
+    id: 7,
+    nome: 'Show no Vivo Rio',
+    local: 'Aterro do Flamengo',
+    tipo: 'show',
+    lat: -22.9272,
+    lng: -43.1729,
+    status: 'estourado',
+    inicio: '22:30',
+    fim: '02:00',
+    publico: '~4.000',
+    motivo: 'Casa lotada, dispersão massiva no fim',
+    tipo_corrida: 'mista',
+    filtros: ['agora', 'proximas', 'noite']
+  },
+  {
+    id: 8,
+    nome: 'Quiosques da Lagoa',
+    local: 'Parque dos Patins',
+    tipo: 'lazer',
+    lat: -22.9711,
+    lng: -43.2096,
+    status: 'media',
+    inicio: '19:00',
+    fim: '00:00',
+    publico: 'fluxo constante',
+    motivo: 'Sexta na Lagoa, casais e grupos de amigos',
+    tipo_corrida: 'curta',
+    filtros: ['agora', 'noite']
+  },
+  {
+    id: 9,
+    nome: 'Hotel Fasano - check-out',
+    local: 'Av. Vieira Souto',
+    tipo: 'corporativo',
+    lat: -22.9854,
+    lng: -43.1995,
+    status: 'media',
+    inicio: '11:00',
+    fim: '13:00',
+    publico: 'turistas',
+    motivo: 'Pico de check-out, corridas para aeroporto',
+    tipo_corrida: 'longa',
+    filtros: ['proximas']
+  },
+  {
+    id: 10,
+    nome: 'Centro empresarial Botafogo',
+    local: 'Praia de Botafogo',
+    tipo: 'corporativo',
+    lat: -22.9501,
+    lng: -43.1805,
+    status: 'alta',
+    inicio: '18:00',
+    fim: '20:00',
+    publico: 'horário comercial',
+    motivo: 'Saída de escritórios em sexta',
+    tipo_corrida: 'mista',
+    filtros: ['proximas']
+  }
+];
+
+/* ===== CONFIGURAÇÕES VISUAIS ===== */
+const STATUS_CONFIG = {
+  baixa:     { label: 'Demanda baixa',  color: '#ef4444', bg: '#3a1414', fg: '#ef4444', pulse: false },
+  media:     { label: 'Demanda média',  color: '#facc15', bg: '#3a3014', fg: '#facc15', pulse: false },
+  alta:      { label: 'Alta demanda',   color: '#22c55e', bg: '#143a1f', fg: '#22c55e', pulse: true  },
+  estourado: { label: 'Estourado 🔥',   color: '#a855f7', bg: '#2e143a', fg: '#c084fc', pulse: true  }
+};
+
+/* ===== FEEDBACK STORAGE (em memória, depois vira backend) ===== */
+const feedbacks = {}; // { eventoId: [{ tipo, timestamp }, ...] }
+
+/* ===== INICIALIZAÇÃO DO MAPA ===== */
+const map = L.map('map', {
+  zoomControl: true,
+  attributionControl: false
+}).setView([-22.9711, -43.1900], 13);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19,
+  subdomains: 'abcd'
+}).addTo(map);
+
+/* ===== MARCADORES ===== */
+let markers = [];
+
+function makeMarkerIcon(status) {
+  const cfg = STATUS_CONFIG[status];
+  const pulseHtml = cfg.pulse
+    ? `<div class="marker-pulse" style="background:${cfg.color};opacity:0.4;"></div>`
+    : '';
+  return L.divIcon({
+    className: 'zq-marker',
+    html: `<div style="position:relative;">${pulseHtml}<div class="marker-dot" style="background:${cfg.color}"></div></div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+}
+
+function renderMarkers(filtro) {
+  // Limpa marcadores antigos
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+
+  const filtrados = filtro === 'todos'
+    ? EVENTOS
+    : EVENTOS.filter(e => e.filtros.includes(filtro));
+
+  filtrados.forEach(ev => {
+    const m = L.marker([ev.lat, ev.lng], { icon: makeMarkerIcon(ev.status) }).addTo(map);
+    m.on('click', () => showEvento(ev));
+    markers.push(m);
+  });
+
+  document.getElementById('event-count').textContent = filtrados.length;
+}
+
+/* ===== CARD DE EVENTO ===== */
+function showEvento(ev) {
+  const cfg = STATUS_CONFIG[ev.status];
+  const sheet = document.getElementById('sheet');
+  const empty = document.getElementById('sheet-empty');
+  const content = document.getElementById('sheet-content');
+
+  empty.style.display = 'none';
+  content.style.display = 'block';
+  sheet.classList.add('expanded');
+
+  content.innerHTML = `
+    <div class="sheet-header">
+      <div>
+        <div class="sheet-title">${ev.nome}</div>
+        <div class="sheet-loc">📍 ${ev.local}</div>
+      </div>
+      <div class="sheet-status" style="background:${cfg.bg};color:${cfg.fg};">${cfg.label}</div>
+    </div>
+
+    <div class="sheet-grid">
+      <div class="sheet-card">
+        <div class="sheet-card-label">Pico</div>
+        <div class="sheet-card-value">${ev.inicio}–${ev.fim}</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-card-label">Público</div>
+        <div class="sheet-card-value" style="font-size:12px;">${ev.publico}</div>
+      </div>
+      <div class="sheet-card">
+        <div class="sheet-card-label">Corrida</div>
+        <div class="sheet-card-value">${ev.tipo_corrida}</div>
+      </div>
+    </div>
+
+    <div class="sheet-reason" style="border-left-color:${cfg.color};">
+      <div class="sheet-reason-label">Por que está acontecendo</div>
+      <div class="sheet-reason-text">${ev.motivo}</div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn-primary" style="background:${cfg.color};" onclick="navegarPara(${ev.id})">
+        🧭 Ir para essa região
+      </button>
+      <button class="btn-secondary" onclick="compartilhar(${ev.id})">📤</button>
+    </div>
+
+    <div class="feedback-section">
+      <div class="feedback-title">Como tá lá?</div>
+      <div class="feedback-buttons">
+        <button class="feedback-btn" onclick="darFeedback(${ev.id}, 'fraco')">
+          <span class="emoji">🥶</span>Tá fraco
+        </button>
+        <button class="feedback-btn" onclick="darFeedback(${ev.id}, 'medio')">
+          <span class="emoji">😐</span>Médio
+        </button>
+        <button class="feedback-btn" onclick="darFeedback(${ev.id}, 'bom')">
+          <span class="emoji">🙂</span>Bom
+        </button>
+        <button class="feedback-btn" onclick="darFeedback(${ev.id}, 'estourado')">
+          <span class="emoji">🔥</span>Estourado
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+/* ===== AÇÕES ===== */
+function navegarPara(id) {
+  const ev = EVENTOS.find(e => e.id === id);
+  if (!ev) return;
+  // Abre Waze / Google Maps com a coordenada
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}&travelmode=driving`;
+  window.open(url, '_blank');
+}
+
+function compartilhar(id) {
+  const ev = EVENTOS.find(e => e.id === id);
+  if (!ev) return;
+  const texto = `🔥 ${ev.nome} em ${ev.local} — ${STATUS_CONFIG[ev.status].label}\nPico: ${ev.inicio}–${ev.fim}\n\nVia Zona Quente RJ`;
+  if (navigator.share) {
+    navigator.share({ title: 'Zona Quente RJ', text: texto });
+  } else {
+    navigator.clipboard.writeText(texto);
+    showToast('Copiado para compartilhar!');
+  }
+}
+
+function darFeedback(id, tipo) {
+  if (!feedbacks[id]) feedbacks[id] = [];
+  feedbacks[id].push({ tipo, timestamp: Date.now() });
+
+  const labels = {
+    fraco: 'Marcado como FRACO',
+    medio: 'Marcado como MÉDIO',
+    bom: 'Marcado como BOM',
+    estourado: 'Marcado como ESTOURADO 🔥'
+  };
+  showToast(labels[tipo] + ' — valeu!');
+
+  // Atualiza status do evento com base nos feedbacks recentes
+  atualizarStatusPorFeedback(id);
+}
+
+/* ===== LÓGICA: MÉDIA PONDERADA POR TEMPO =====
+   Feedback dos últimos 30 minutos pesa mais.
+*/
+function atualizarStatusPorFeedback(eventoId) {
+  const fbs = feedbacks[eventoId];
+  if (!fbs || fbs.length === 0) return;
+
+  const agora = Date.now();
+  const TRINTA_MIN = 30 * 60 * 1000;
+
+  const pesos = { fraco: 1, medio: 2, bom: 3, estourado: 4 };
+  let somaPonderada = 0;
+  let pesoTotal = 0;
+
+  fbs.forEach(fb => {
+    const idade = agora - fb.timestamp;
+    // Recente = peso 1.0; > 30min = decai linearmente
+    const pesoTempo = idade < TRINTA_MIN ? 1.0 : Math.max(0.1, 1 - (idade / (60 * 60 * 1000)));
+    somaPonderada += pesos[fb.tipo] * pesoTempo;
+    pesoTotal += pesoTempo;
+  });
+
+  const media = somaPonderada / pesoTotal;
+  let novoStatus;
+  if (media < 1.5) novoStatus = 'baixa';
+  else if (media < 2.5) novoStatus = 'media';
+  else if (media < 3.5) novoStatus = 'alta';
+  else novoStatus = 'estourado';
+
+  const ev = EVENTOS.find(e => e.id === eventoId);
+  if (ev && ev.status !== novoStatus) {
+    ev.status = novoStatus;
+    const filtroAtivo = document.querySelector('.filter-btn.active').dataset.filter;
+    renderMarkers(filtroAtivo);
+    setTimeout(() => showEvento(ev), 300);
+  }
+}
+
+/* ===== TOAST ===== */
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ===== FILTROS ===== */
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderMarkers(btn.dataset.filter);
+  });
+});
+
+/* ===== BOTTOM SHEET INTERAÇÃO ===== */
+document.querySelector('.sheet-handle').addEventListener('click', () => {
+  document.getElementById('sheet').classList.toggle('expanded');
+});
+
+/* ===== LISTA DE EVENTOS ===== */
+function abrirListaEventos(somenteQuentes = false) {
+  const lista = document.getElementById('events-list');
+  const content = document.getElementById('events-list-content');
+  const titulo = document.querySelector('.events-list-title');
+
+  let evs = EVENTOS.slice();
+  if (somenteQuentes) {
+    evs = evs.filter(e => e.status === 'alta' || e.status === 'estourado');
+    titulo.textContent = '🔥 Eventos quentes agora';
+  } else {
+    titulo.textContent = 'Eventos de hoje';
+  }
+  // Ordena: estourado > alta > media > baixa
+  const ordem = { estourado: 0, alta: 1, media: 2, baixa: 3 };
+  evs.sort((a, b) => ordem[a.status] - ordem[b.status]);
+
+  content.innerHTML = evs.map(ev => {
+    const cfg = STATUS_CONFIG[ev.status];
+    return `
+      <div class="event-card" onclick="abrirEventoDoMapa(${ev.id})">
+        <div class="event-card-header">
+          <div>
+            <div class="event-card-title">${ev.nome}</div>
+            <div class="event-card-loc">📍 ${ev.local}</div>
+          </div>
+          <div class="sheet-status" style="background:${cfg.bg};color:${cfg.fg};">${cfg.label}</div>
+        </div>
+        <div class="event-card-meta">
+          <span>⏰ ${ev.inicio}–${ev.fim}</span>
+          <span>👥 ${ev.publico}</span>
+          <span style="text-transform:capitalize;">🚗 ${ev.tipo_corrida}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  lista.classList.add('show');
+}
+
+function abrirEventoDoMapa(id) {
+  document.getElementById('events-list').classList.remove('show');
+  const ev = EVENTOS.find(e => e.id === id);
+  if (ev) {
+    map.setView([ev.lat, ev.lng], 16);
+    setTimeout(() => showEvento(ev), 300);
+  }
+}
+
+document.getElementById('events-back').addEventListener('click', () => {
+  document.getElementById('events-list').classList.remove('show');
+});
+
+/* ===== NAVEGAÇÃO INFERIOR ===== */
+document.getElementById('nav-events').addEventListener('click', () => abrirListaEventos(false));
+document.getElementById('nav-hot').addEventListener('click', () => abrirListaEventos(true));
+document.getElementById('nav-info').addEventListener('click', () => {
+  alert('Zona Quente RJ — MVP v1\n\nMapa em tempo real para motoristas no Rio.\n\nVersão de teste — feedback bem-vindo!');
+});
+document.getElementById('nav-map').addEventListener('click', () => {
+  document.getElementById('events-list').classList.remove('show');
+});
+
+/* ===== INICIALIZAÇÃO ===== */
+renderMarkers('agora');
+
+console.log('🔥 Zona Quente RJ carregado com', EVENTOS.length, 'eventos.');
+</script>
+
+</body>
+</html>
