@@ -149,6 +149,56 @@
   .legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #ddd; padding: 2px 0; }
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
+  /* === BOTÃO "ONDE ESTOU" === */
+  .btn-location {
+    position: absolute;
+    bottom: 90px;
+    right: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(20,20,20,0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid #333;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 500;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .btn-location:hover { background: #FF6B35; border-color: #FF6B35; }
+  .btn-location.active { background: #2563eb; border-color: #2563eb; }
+  .btn-location.loading { animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  /* === MARCADOR DA LOCALIZAÇÃO DO MOTORISTA === */
+  .user-location-marker { background: transparent !important; border: none !important; }
+  .user-location-pulse {
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    background: #3b82f6;
+    opacity: 0.3;
+    animation: userPulse 2s infinite;
+  }
+  .user-location-dot {
+    position: relative;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  @keyframes userPulse {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
+
   /* === STATS FLUTUANTE === */
   .stats {
     position: absolute; top: 12px; right: 12px;
@@ -428,6 +478,7 @@
   <!-- FILTROS -->
   <div class="filters">
     <button class="filter-btn active" data-filter="agora">⚡ Acontecendo agora</button>
+    <button class="filter-btn" data-filter="perto">📍 Perto de mim</button>
     <button class="filter-btn" data-filter="proximas">⏰ Próximas horas</button>
     <button class="filter-btn" data-filter="noite">🌙 Noite</button>
     <button class="filter-btn" data-filter="todos">Todos</button>
@@ -449,6 +500,11 @@
       <div class="stats-label">Eventos visíveis</div>
       <div class="stats-num" id="event-count">0</div>
     </div>
+
+    <!-- Botão de localização (flutuante) -->
+    <button class="btn-location" id="btn-location" onclick="centralizarMinhaLocalizacao()" title="Mostrar minha localização">
+      <span id="btn-location-icon">📍</span>
+    </button>
   </div>
 
   <!-- BOTTOM SHEET (card do evento) -->
@@ -621,16 +677,41 @@ function renderMarkers(filtro) {
   // 1. Filtra eventos ativos (não expirados)
   const ativos = EVENTOS.filter(eventoEstaAtivo);
 
-  // 2. Aplica o filtro do botão (agora/noite/etc)
-  const filtrados = filtro === 'todos'
-    ? ativos
-    : ativos.filter(e => e.filtros && e.filtros.includes(filtro));
+  // 2. Aplica o filtro do botão
+  let filtrados;
+  if (filtro === 'todos') {
+    filtrados = ativos;
+  } else if (filtro === 'perto') {
+    // Filtra eventos a menos de RAIO_PERTO_KM da minha localização
+    if (!minhaLocalizacao) {
+      filtrados = [];
+      showToast('📍 Aguarde sua localização carregar...');
+    } else {
+      filtrados = ativos.filter(ev => {
+        const dist = calcularDistanciaKm(minhaLocalizacao.lat, minhaLocalizacao.lng, ev.lat, ev.lng);
+        ev._distancia = dist; // salva pra mostrar no card
+        return dist <= RAIO_PERTO_KM;
+      });
+      // Ordena por proximidade (mais perto primeiro)
+      filtrados.sort((a, b) => a._distancia - b._distancia);
+    }
+  } else {
+    filtrados = ativos.filter(e => e.filtros && e.filtros.includes(filtro));
+  }
+
+  // Calcula distância pra todos os eventos exibidos (mesmo fora do filtro "perto")
+  if (minhaLocalizacao) {
+    filtrados.forEach(ev => {
+      if (ev._distancia === undefined) {
+        ev._distancia = calcularDistanciaKm(minhaLocalizacao.lat, minhaLocalizacao.lng, ev.lat, ev.lng);
+      }
+    });
+  }
 
   filtrados.forEach(ev => {
     const statusAgregado = calcularStatusAgregado(ev);
     ev._statusVisual = statusAgregado;
 
-    // Eventos terminando ficam com opacidade reduzida
     const terminando = eventoEstaTerminando(ev);
     const m = L.marker([ev.lat, ev.lng], {
       icon: makeMarkerIcon(statusAgregado),
@@ -686,6 +767,15 @@ function showEvento(ev) {
       <div class="sheet-reason-label">Por que está acontecendo</div>
       <div class="sheet-reason-text">${ev.motivo}</div>
     </div>
+
+    ${ev._distancia !== undefined ? `
+    <div style="background:#1a1a1a;padding:10px 12px;border-radius:8px;margin-top:10px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:18px;">📍</div>
+      <div>
+        <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;">Distância de você</div>
+        <div style="color:#fff;font-size:14px;font-weight:600;margin-top:2px;">${ev._distancia < 1 ? Math.round(ev._distancia * 1000) + ' m' : ev._distancia.toFixed(1) + ' km'}</div>
+      </div>
+    </div>` : ''}
 
     ${(() => {
       // Card de info sobre feedback dos motoristas
@@ -981,6 +1071,113 @@ document.getElementById('nav-map').addEventListener('click', () => {
   document.getElementById('events-list').classList.remove('show');
 });
 
+/* =====================================================
+   LOCALIZAÇÃO DO MOTORISTA (privada — não vai pro Firebase)
+   ===================================================== */
+let minhaLocalizacao = null;       // { lat, lng, accuracy }
+let userMarker = null;             // marcador no mapa
+let watchId = null;                // ID do watchPosition
+
+// Raio em km do filtro "perto"
+const RAIO_PERTO_KM = 3;
+
+// Calcula distância em km entre 2 pontos (fórmula de Haversine)
+function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
+  const R = 6371; // raio da Terra em km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) ** 2 +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng/2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Inicia o monitoramento de localização
+function iniciarGeolocalizacao() {
+  if (!navigator.geolocation) {
+    console.warn('Geolocalização não suportada nesse navegador');
+    return;
+  }
+
+  const btn = document.getElementById('btn-location');
+  btn.classList.add('loading');
+
+  // watchPosition fica monitorando em tempo real (eficiente em bateria)
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      btn.classList.remove('loading');
+      btn.classList.add('active');
+      minhaLocalizacao = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+      };
+      atualizarMarcadorUsuario();
+
+      // Se filtro "perto" estiver ativo, re-renderiza
+      const filtroAtivo = document.querySelector('.filter-btn.active');
+      if (filtroAtivo && filtroAtivo.dataset.filter === 'perto') {
+        renderMarkers('perto');
+      }
+    },
+    (err) => {
+      btn.classList.remove('loading', 'active');
+      console.warn('Erro de geolocalização:', err.message);
+      if (err.code === 1) {
+        showToast('Permissão de localização negada');
+      } else if (err.code === 2) {
+        showToast('Não foi possível obter localização');
+      } else {
+        showToast('Erro de localização');
+      }
+    },
+    {
+      enableHighAccuracy: false,    // economiza bateria
+      timeout: 15000,
+      maximumAge: 30000             // aceita posição de até 30s atrás
+    }
+  );
+}
+
+// Cria/atualiza o marcador azul "você está aqui"
+function atualizarMarcadorUsuario() {
+  if (!minhaLocalizacao || !map) return;
+
+  if (userMarker) map.removeLayer(userMarker);
+
+  const icon = L.divIcon({
+    className: 'user-location-marker',
+    html: '<div style="position:relative;"><div class="user-location-pulse"></div><div class="user-location-dot"></div></div>',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  });
+
+  userMarker = L.marker([minhaLocalizacao.lat, minhaLocalizacao.lng], {
+    icon,
+    zIndexOffset: 1000  // sempre por cima dos pinos de eventos
+  }).addTo(map);
+}
+
+// Botão "Onde estou" — centraliza no usuário
+function centralizarMinhaLocalizacao() {
+  const btn = document.getElementById('btn-location');
+
+  if (!minhaLocalizacao) {
+    // Primeira vez — pede permissão e inicia
+    if (!watchId) {
+      iniciarGeolocalizacao();
+      showToast('📍 Buscando sua localização...');
+    } else {
+      showToast('📍 Aguarde a localização carregar...');
+    }
+    return;
+  }
+
+  // Centraliza o mapa na localização atual
+  map.setView([minhaLocalizacao.lat, minhaLocalizacao.lng], 15);
+}
+
 /* ===== INICIALIZAÇÃO ===== */
 // Espera o Firebase carregar antes de conectar
 if (window.zqFirebase) {
@@ -988,6 +1185,10 @@ if (window.zqFirebase) {
 } else {
   window.addEventListener('firebase-ready', conectarFirebase);
 }
+
+// Inicia geolocalização automaticamente (pede permissão na primeira visita)
+// Pequeno delay pra deixar o mapa carregar primeiro
+setTimeout(iniciarGeolocalizacao, 1500);
 
 // A cada 60 segundos, re-renderiza pra atualizar quem expirou
 setInterval(() => {
