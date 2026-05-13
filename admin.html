@@ -12,6 +12,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCcQnWQ9zd17SK9RDiXAQrOBgPVekznS5M",
@@ -25,8 +26,12 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
+  const auth = getAuth(app);
+
   window.zqFirebase = {
-    db, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, setDoc
+    db, auth,
+    collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, setDoc,
+    signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail
   };
 
   window.dispatchEvent(new Event('firebase-ready'));
@@ -299,13 +304,168 @@
     h1 { font-size: 18px; }
     body { padding: 12px; }
   }
+
+  /* === TELA DE LOGIN === */
+  .login-screen {
+    position: fixed;
+    inset: 0;
+    background: #0d0d0d;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-box {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .login-logo {
+    text-align: center;
+    margin-bottom: 22px;
+  }
+  .login-logo .icon {
+    width: 56px; height: 56px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #FF6B35, #ff4500);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+  .login-logo h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .login-logo p {
+    font-size: 12px;
+    color: #888;
+    margin-top: 2px;
+  }
+  .login-box label {
+    margin-top: 14px;
+    font-size: 11px;
+  }
+  .login-box .btn {
+    margin-top: 18px;
+  }
+  .login-link {
+    display: block;
+    text-align: center;
+    color: #888;
+    font-size: 12px;
+    margin-top: 14px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .login-link:hover { color: #FF6B35; }
+  .login-error {
+    background: #2a1414;
+    border: 1px solid #dc2626;
+    color: #fca5a5;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-top: 14px;
+    display: none;
+  }
+  .login-error.show { display: block; }
+  .login-loading {
+    color: #888;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 12px;
+    display: none;
+  }
+  .login-loading.show { display: block; }
+
+  /* === HEADER DO ADMIN COM LOGOUT === */
+  .admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .admin-header-info {
+    flex: 1;
+  }
+  .user-info {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 100px;
+    padding: 6px 12px;
+    font-size: 11px;
+    color: #aaa;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .user-info button {
+    background: transparent;
+    border: none;
+    color: #FF6B35;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 0;
+  }
+  .user-info button:hover { text-decoration: underline; }
+
+  /* Esconder conteúdo até logar */
+  .app-content {
+    display: none;
+  }
+  .app-content.authenticated {
+    display: block;
+  }
 </style>
 </head>
 <body>
 
+<!-- TELA DE LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">🔥</div>
+      <h1>Zona Quente RJ</h1>
+      <p>Painel administrativo</p>
+    </div>
+
+    <label>Email</label>
+    <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+
+    <label>Senha</label>
+    <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+
+    <div class="login-error" id="login-error"></div>
+    <div class="login-loading" id="login-loading">Entrando...</div>
+
+    <button class="btn" onclick="fazerLogin()">Entrar</button>
+
+    <a class="login-link" onclick="esqueciSenha()">Esqueci minha senha</a>
+  </div>
+</div>
+
+<!-- CONTEÚDO DO ADMIN (escondido até logar) -->
+<div class="app-content" id="app-content">
+
 <div class="container">
-  <h1>🔥 Admin — Zona Quente RJ</h1>
-  <div class="subtitle">Cadastre eventos sem dor de cabeça</div>
+  <div class="admin-header">
+    <div class="admin-header-info">
+      <h1>🔥 Admin — Zona Quente RJ</h1>
+      <div class="subtitle">Cadastre eventos sem dor de cabeça</div>
+    </div>
+    <div class="user-info">
+      <span id="user-email">...</span>
+      <button onclick="fazerLogout()">Sair</button>
+    </div>
+  </div>
 
   <div class="edit-banner hidden" id="edit-banner">
     <span>✏️ Editando: <strong id="edit-name"></strong></span>
@@ -447,6 +607,8 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+</div> <!-- /app-content -->
 
 <script>
 let eventos = []; // vem do Firebase
@@ -1009,14 +1171,124 @@ if (favoritos.length === 0) {
   localStorage.setItem('zq_favoritos', JSON.stringify(favoritos));
 }
 
+/* =====================================================
+   AUTENTICAÇÃO — LOGIN / LOGOUT
+   ===================================================== */
+let usuarioLogado = null;
+
+async function fazerLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  const loadingEl = document.getElementById('login-loading');
+
+  errorEl.classList.remove('show');
+
+  if (!email || !senha) {
+    errorEl.textContent = 'Preencha email e senha';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  if (!window.zqFirebase) {
+    errorEl.textContent = 'Aguarde o servidor conectar...';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  loadingEl.classList.add('show');
+
+  try {
+    const { auth, signInWithEmailAndPassword } = window.zqFirebase;
+    await signInWithEmailAndPassword(auth, email, senha);
+    // onAuthStateChanged vai mostrar o admin automaticamente
+  } catch (err) {
+    loadingEl.classList.remove('show');
+    let msg = 'Erro ao entrar';
+    if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+      msg = 'Email ou senha incorretos';
+    } else if (err.code === 'auth/invalid-email') {
+      msg = 'Email inválido';
+    } else if (err.code === 'auth/too-many-requests') {
+      msg = 'Muitas tentativas. Tente daqui a pouco.';
+    } else if (err.code === 'auth/network-request-failed') {
+      msg = 'Sem conexão com a internet';
+    }
+    errorEl.textContent = msg;
+    errorEl.classList.add('show');
+    console.error('Login error:', err);
+  }
+}
+
+async function esqueciSenha() {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) {
+    document.getElementById('login-error').textContent = 'Digite seu email primeiro no campo acima';
+    document.getElementById('login-error').classList.add('show');
+    return;
+  }
+  try {
+    const { auth, sendPasswordResetEmail } = window.zqFirebase;
+    await sendPasswordResetEmail(auth, email);
+    alert('Email de recuperação enviado para ' + email + '. Confira sua caixa de entrada (e spam).');
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
+async function fazerLogout() {
+  if (!confirm('Deseja sair?')) return;
+  const { auth, signOut } = window.zqFirebase;
+  await signOut(auth);
+  // onAuthStateChanged vai mostrar a tela de login
+}
+
+// Escuta mudanças de autenticação (logou/deslogou)
+function iniciarAuth() {
+  if (!window.zqFirebase) {
+    setTimeout(iniciarAuth, 100);
+    return;
+  }
+
+  const { auth, onAuthStateChanged } = window.zqFirebase;
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      // Logado: mostra o admin
+      usuarioLogado = user;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-content').classList.add('authenticated');
+      document.getElementById('user-email').textContent = user.email;
+      // Conecta no Firestore agora que tá autenticado
+      conectarFirebaseAdmin();
+    } else {
+      // Deslogado: mostra tela de login
+      usuarioLogado = null;
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('app-content').classList.remove('authenticated');
+      // Limpa campos
+      document.getElementById('login-email').value = '';
+      document.getElementById('login-password').value = '';
+      document.getElementById('login-error').classList.remove('show');
+      document.getElementById('login-loading').classList.remove('show');
+    }
+  });
+}
+
+// Enter pra fazer login
+document.getElementById('login-password').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') fazerLogin();
+});
+document.getElementById('login-email').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    document.getElementById('login-password').focus();
+  }
+});
+
 renderFavoritos();
 
-// Conecta no Firebase quando estiver pronto
-if (window.zqFirebase) {
-  conectarFirebaseAdmin();
-} else {
-  window.addEventListener('firebase-ready', conectarFirebaseAdmin);
-}
+// Inicia o sistema de autenticação
+iniciarAuth();
 </script>
 
 </body>
