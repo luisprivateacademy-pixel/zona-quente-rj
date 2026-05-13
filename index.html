@@ -646,14 +646,22 @@ function showEvento(ev) {
       <div class="sheet-reason-text">${ev.motivo}</div>
     </div>
 
-    ${totalFeedbacks > 0 ? `
-    <div style="background:#1a1a1a;padding:10px 12px;border-radius:8px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;">👥 Feedback dos motoristas (última 1h)</div>
-        <div style="color:#fff;font-size:13px;font-weight:600;margin-top:3px;">${totalFeedbacks} ${totalFeedbacks === 1 ? 'voto' : 'votos'} recentes</div>
-      </div>
-      <div style="color:${cfg.fg};font-size:11px;font-weight:600;padding:4px 10px;background:${cfg.bg};border-radius:100px;">${cfg.label.replace(' 🔥', '')}</div>
-    </div>` : ''}
+    ${(() => {
+      // Card de info sobre feedback dos motoristas
+      const fontInfo = totalFeedbacks === 0
+        ? { titulo: 'Status definido por:', valor: '📋 Admin (sem votos ainda)', cor: '#888' }
+        : totalFeedbacks === 1
+          ? { titulo: 'Status definido por:', valor: '👥 1 voto + admin', cor: '#facc15' }
+          : totalFeedbacks === 2
+            ? { titulo: 'Status definido por:', valor: '👥 2 votos + admin', cor: '#facc15' }
+            : { titulo: 'Status definido por:', valor: `🔥 ${totalFeedbacks} motoristas (consenso)`, cor: '#22c55e' };
+
+      return `
+    <div style="background:#1a1a1a;padding:10px 12px;border-radius:8px;margin-top:10px;">
+      <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;">${fontInfo.titulo}</div>
+      <div style="color:${fontInfo.cor};font-size:12px;font-weight:600;margin-top:3px;">${fontInfo.valor}</div>
+    </div>`;
+    })()}
 
     <div class="sheet-actions">
       <button class="btn-primary" style="background:${cfg.color};" onclick="navegarPara('${ev.id}')">
@@ -767,52 +775,72 @@ async function darFeedback(id, tipo) {
 }
 
 /* =====================================================
-   CALCULA STATUS DO EVENTO BASEADO NOS FEEDBACKS RECENTES
+   CALCULA STATUS DO EVENTO BASEADO NOS FEEDBACKS — MODELO HÍBRIDO
+
+   Como funciona:
+   - 0 votos: usa o status que o admin cadastrou
+   - 1 voto: 50% admin + 50% motoristas
+   - 2 votos: 25% admin + 75% motoristas
+   - 3+ votos: 100% motoristas (consenso)
+
+   Peso por tempo:
    - Últimos 30min: peso 100%
    - 30min a 1h: peso decrescente (linear)
    - Mais de 1h: ignorado
    ===================================================== */
+
+// Converte string de status pra número (pra poder fazer média)
+const STATUS_NUMERO = { baixa: 1, media: 2, alta: 3, estourado: 4 };
+
+// Converte número de volta pra string (com arredondamento)
+function numeroParaStatus(n) {
+  if (n < 1.5) return 'baixa';
+  else if (n < 2.5) return 'media';
+  else if (n < 3.5) return 'alta';
+  else return 'estourado';
+}
+
 function calcularStatusAgregado(evento) {
   const feedbacks = evento.feedbacks_recentes || [];
-  if (feedbacks.length === 0) {
-    return evento.status; // sem feedback, usa o status original cadastrado
-  }
+  const statusAdmin = STATUS_NUMERO[evento.status] || 2; // padrão "média"
 
+  // Filtra só os feedbacks que ainda contam (até 1h)
   const agora = Date.now();
-  const TRINTA_MIN = 30 * 60 * 1000;
   const UMA_HORA = 60 * 60 * 1000;
-  const pesos = { fraco: 1, medio: 2, bom: 3, estourado: 4 };
+  const TRINTA_MIN = 30 * 60 * 1000;
+  const validos = feedbacks.filter(f => (agora - f.timestamp) < UMA_HORA);
 
+  // Sem votos: usa o status do admin direto
+  if (validos.length === 0) return evento.status;
+
+  // Calcula média ponderada por tempo dos votos
   let somaPonderada = 0;
   let pesoTotal = 0;
-  let votosValidos = 0;
 
-  feedbacks.forEach(fb => {
+  validos.forEach(fb => {
     const idade = agora - fb.timestamp;
-    if (idade > UMA_HORA) return; // ignora >1h
-
     let pesoTempo;
     if (idade < TRINTA_MIN) {
-      pesoTempo = 1.0; // peso máximo
+      pesoTempo = 1.0;
     } else {
-      // Decai linearmente de 1.0 (30min) até 0 (60min)
       pesoTempo = 1.0 - ((idade - TRINTA_MIN) / TRINTA_MIN);
     }
-
-    somaPonderada += pesos[fb.tipo] * pesoTempo;
+    somaPonderada += (STATUS_NUMERO[fb.tipo] || 2) * pesoTempo;
     pesoTotal += pesoTempo;
-    votosValidos++;
   });
 
-  // Se tem poucos votos válidos (<2), considera só parcialmente — mistura com status original
-  if (votosValidos === 0) return evento.status;
+  const mediaVotos = somaPonderada / pesoTotal;
 
-  const media = somaPonderada / pesoTotal;
+  // MISTURA HÍBRIDA — quanto mais votos, mais peso pros motoristas
+  let pesoVotos;
+  if (validos.length === 1) pesoVotos = 0.5;       // 50%
+  else if (validos.length === 2) pesoVotos = 0.75; // 75%
+  else pesoVotos = 1.0;                            // 100% (3+ votos)
 
-  if (media < 1.5) return 'baixa';
-  else if (media < 2.5) return 'media';
-  else if (media < 3.5) return 'alta';
-  else return 'estourado';
+  const pesoAdmin = 1.0 - pesoVotos;
+  const mediaFinal = (mediaVotos * pesoVotos) + (statusAdmin * pesoAdmin);
+
+  return numeroParaStatus(mediaFinal);
 }
 
 /* Função pra contar feedbacks recentes (pra mostrar no card) */
