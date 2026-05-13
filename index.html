@@ -14,6 +14,39 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+<!-- Firebase SDK (modular, via CDN) -->
+<script type="module">
+  // Importa Firebase do CDN oficial
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getFirestore, collection, onSnapshot, doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  // Configuração do Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyCcQnWQ9zd17SK9RDiXAQrOBgPVekznS5M",
+    authDomain: "zona-quente-rj.firebaseapp.com",
+    projectId: "zona-quente-rj",
+    storageBucket: "zona-quente-rj.firebasestorage.app",
+    messagingSenderId: "391720260616",
+    appId: "1:391720260616:web:aac6f93d541621fe32edbd"
+  };
+
+  // Inicializa Firebase e expõe globalmente
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  window.zqFirebase = {
+    db,
+    collection,
+    onSnapshot,
+    doc,
+    updateDoc,
+    increment
+  };
+
+  // Avisa que tá pronto
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
 <style>
   /* === RESET === */
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -474,158 +507,41 @@
    ========================================================================= */
 
 /* ===== DADOS MOCKADOS (vai virar API depois) ===== */
-const EVENTOS = [
-  {
-    id: 1,
-    nome: 'Show no Circo Voador',
-    local: 'Lapa',
-    tipo: 'show',
-    lat: -22.9133,
-    lng: -43.1797,
-    status: 'estourado',
-    inicio: '22:00',
-    fim: '03:30',
-    publico: '~2.500',
-    motivo: 'Show indie + casas de shows da Lapa lotadas',
-    tipo_corrida: 'mista',
-    filtros: ['agora', 'noite']
-  },
-  {
-    id: 2,
-    nome: 'Pré-jogo Flamengo x Vasco',
-    local: 'Saída Maracanã (rota Botafogo)',
-    tipo: 'esporte',
-    lat: -22.9519,
-    lng: -43.1810,
-    status: 'alta',
-    inicio: '19:30',
-    fim: '23:30',
-    publico: '~60.000',
-    motivo: 'Saída do estádio com fluxo forte para Zona Sul',
-    tipo_corrida: 'longa',
-    filtros: ['agora', 'noite']
-  },
-  {
-    id: 3,
-    nome: 'Restaurantes em Ipanema',
-    local: 'Rua Garcia D\'Ávila',
-    tipo: 'gastronomia',
-    lat: -22.9836,
-    lng: -43.2065,
-    status: 'alta',
-    inicio: '20:00',
-    fim: '01:00',
-    publico: 'fluxo constante',
-    motivo: 'Sexta-feira movimentada, jantares e baladas',
-    tipo_corrida: 'curta',
-    filtros: ['agora', 'noite']
-  },
-  {
-    id: 4,
-    nome: 'Evento no Copacabana Palace',
-    local: 'Av. Atlântica',
-    tipo: 'corporativo',
-    lat: -22.9676,
-    lng: -43.1779,
-    status: 'media',
-    inicio: '21:00',
-    fim: '00:00',
-    publico: '~400 convidados',
-    motivo: 'Evento corporativo, saída prevista para meia-noite',
-    tipo_corrida: 'longa',
-    filtros: ['agora', 'noite']
-  },
-  {
-    id: 5,
-    nome: 'Bares de Botafogo',
-    local: 'Rua Voluntários da Pátria',
-    tipo: 'gastronomia',
-    lat: -22.9520,
-    lng: -43.1843,
-    status: 'alta',
-    inicio: '19:00',
-    fim: '02:00',
-    publico: 'fluxo alto',
-    motivo: 'Hub de bares, pico em sextas e sábados',
-    tipo_corrida: 'curta',
-    filtros: ['agora', 'noite']
-  },
-  {
-    id: 6,
-    nome: 'Praia Lounge - Leblon',
-    local: 'Posto 12',
-    tipo: 'lazer',
-    lat: -22.9869,
-    lng: -43.2233,
-    status: 'baixa',
-    inicio: '17:00',
-    fim: '21:00',
-    publico: '~150',
-    motivo: 'Fim de praia, dispersão lenta',
-    tipo_corrida: 'curta',
-    filtros: ['agora']
-  },
-  {
-    id: 7,
-    nome: 'Show no Vivo Rio',
-    local: 'Aterro do Flamengo',
-    tipo: 'show',
-    lat: -22.9272,
-    lng: -43.1729,
-    status: 'estourado',
-    inicio: '22:30',
-    fim: '02:00',
-    publico: '~4.000',
-    motivo: 'Casa lotada, dispersão massiva no fim',
-    tipo_corrida: 'mista',
-    filtros: ['agora', 'proximas', 'noite']
-  },
-  {
-    id: 8,
-    nome: 'Quiosques da Lagoa',
-    local: 'Parque dos Patins',
-    tipo: 'lazer',
-    lat: -22.9711,
-    lng: -43.2096,
-    status: 'media',
-    inicio: '19:00',
-    fim: '00:00',
-    publico: 'fluxo constante',
-    motivo: 'Sexta na Lagoa, casais e grupos de amigos',
-    tipo_corrida: 'curta',
-    filtros: ['agora', 'noite']
-  },
-  {
-    id: 9,
-    nome: 'Hotel Fasano - check-out',
-    local: 'Av. Vieira Souto',
-    tipo: 'corporativo',
-    lat: -22.9854,
-    lng: -43.1995,
-    status: 'media',
-    inicio: '11:00',
-    fim: '13:00',
-    publico: 'turistas',
-    motivo: 'Pico de check-out, corridas para aeroporto',
-    tipo_corrida: 'longa',
-    filtros: ['proximas']
-  },
-  {
-    id: 10,
-    nome: 'Centro empresarial Botafogo',
-    local: 'Praia de Botafogo',
-    tipo: 'corporativo',
-    lat: -22.9501,
-    lng: -43.1805,
-    status: 'alta',
-    inicio: '18:00',
-    fim: '20:00',
-    publico: 'horário comercial',
-    motivo: 'Saída de escritórios em sexta',
-    tipo_corrida: 'mista',
-    filtros: ['proximas']
+/* ===== EVENTOS (vem do Firebase em tempo real) ===== */
+let EVENTOS = [];
+
+// Função que conecta ao Firebase e escuta mudanças em tempo real
+function conectarFirebase() {
+  if (!window.zqFirebase) {
+    // Se o Firebase ainda não carregou, espera um pouco
+    setTimeout(conectarFirebase, 100);
+    return;
   }
-];
+
+  const { db, collection, onSnapshot } = window.zqFirebase;
+
+  // Escuta a coleção 'eventos' em tempo real
+  onSnapshot(collection(db, 'eventos'), (snapshot) => {
+    EVENTOS = snapshot.docs.map(doc => ({
+      id: doc.id,  // ID do Firestore vira o id do evento
+      ...doc.data()
+    }));
+
+    // Re-renderiza o mapa com os novos dados
+    const filtroAtivo = document.querySelector('.filter-btn.active');
+    if (filtroAtivo) renderMarkers(filtroAtivo.dataset.filter);
+    console.log('🔥 Eventos atualizados:', EVENTOS.length);
+  }, (error) => {
+    console.error('Erro Firebase:', error);
+    mostrarErroFirebase();
+  });
+}
+
+function mostrarErroFirebase() {
+  document.getElementById('event-count').textContent = '!';
+  const card = document.getElementById('sheet-empty');
+  if (card) card.innerHTML = '⚠️ Erro ao conectar com servidor. Tente recarregar.';
+}
 
 /* ===== CONFIGURAÇÕES VISUAIS ===== */
 const STATUS_CONFIG = {
@@ -771,20 +687,29 @@ function compartilhar(id) {
   }
 }
 
-function darFeedback(id, tipo) {
-  if (!feedbacks[id]) feedbacks[id] = [];
-  feedbacks[id].push({ tipo, timestamp: Date.now() });
-
+async function darFeedback(id, tipo) {
   const labels = {
     fraco: 'Marcado como FRACO',
     medio: 'Marcado como MÉDIO',
     bom: 'Marcado como BOM',
     estourado: 'Marcado como ESTOURADO 🔥'
   };
-  showToast(labels[tipo] + ' — valeu!');
 
-  // Atualiza status do evento com base nos feedbacks recentes
-  atualizarStatusPorFeedback(id);
+  // Salva o feedback no Firebase (contador por tipo)
+  try {
+    if (window.zqFirebase) {
+      const { db, doc, updateDoc, increment } = window.zqFirebase;
+      const eventoRef = doc(db, 'eventos', String(id));
+      await updateDoc(eventoRef, {
+        ['feedback_' + tipo]: increment(1),
+        ultimo_feedback: Date.now()
+      });
+    }
+    showToast(labels[tipo] + ' — valeu!');
+  } catch (err) {
+    console.error('Erro ao salvar feedback:', err);
+    showToast('Erro ao enviar. Tenta de novo.');
+  }
 }
 
 /* ===== LÓGICA: MÉDIA PONDERADA POR TEMPO =====
@@ -913,9 +838,14 @@ document.getElementById('nav-map').addEventListener('click', () => {
 });
 
 /* ===== INICIALIZAÇÃO ===== */
-renderMarkers('agora');
+// Espera o Firebase carregar antes de conectar
+if (window.zqFirebase) {
+  conectarFirebase();
+} else {
+  window.addEventListener('firebase-ready', conectarFirebase);
+}
 
-console.log('🔥 Zona Quente RJ carregado com', EVENTOS.length, 'eventos.');
+console.log('🔥 Zona Quente RJ carregando...');
 </script>
 
 </body>
