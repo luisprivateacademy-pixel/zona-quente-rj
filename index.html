@@ -164,9 +164,8 @@
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
   /* === BOTÃO "ONDE ESTOU" === */
-  .btn-location {
+  .btn-floating {
     position: absolute;
-    bottom: 90px;
     right: 12px;
     width: 44px;
     height: 44px;
@@ -185,10 +184,90 @@
     justify-content: center;
     transition: all 0.2s;
   }
-  .btn-location:hover { background: #FF6B35; border-color: #FF6B35; }
-  .btn-location.active { background: #2563eb; border-color: #2563eb; }
-  .btn-location.loading { animation: spin 1s linear infinite; }
+  .btn-location { bottom: 90px; }
+  .btn-notif { bottom: 144px; }
+  .btn-floating:hover { background: #FF6B35; border-color: #FF6B35; }
+  .btn-floating.active { background: #2563eb; border-color: #2563eb; }
+  .btn-floating.loading { animation: spin 1s linear infinite; }
+  .btn-notif.enabled { background: #FF6B35; border-color: #FF6B35; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  /* === MODAL DE NOTIFICAÇÕES === */
+  .notif-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(6px);
+    z-index: 5000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .notif-modal.show { display: flex; }
+  .notif-modal-content {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 360px;
+    width: 100%;
+  }
+  .notif-modal-icon {
+    text-align: center;
+    font-size: 48px;
+    margin-bottom: 10px;
+  }
+  .notif-modal-title {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+  .notif-modal-desc {
+    color: #aaa;
+    font-size: 13px;
+    margin: 0 0 10px;
+  }
+  .notif-modal-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 14px;
+  }
+  .notif-modal-list li {
+    color: #ddd;
+    font-size: 13px;
+    padding: 6px 0;
+    border-bottom: 1px solid #232323;
+  }
+  .notif-modal-list li:last-child { border-bottom: none; }
+  .notif-modal-foot {
+    color: #666;
+    font-size: 11px;
+    margin: 0 0 18px;
+    text-align: center;
+  }
+  .notif-modal-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-modal-cancel, .btn-modal-confirm {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-modal-cancel {
+    background: #2a2a2a;
+    color: #aaa;
+  }
+  .btn-modal-confirm {
+    background: #FF6B35;
+    color: #fff;
+  }
 
   /* === MARCADOR DA LOCALIZAÇÃO DO MOTORISTA === */
   .user-location-marker { background: transparent !important; border: none !important; }
@@ -515,10 +594,36 @@
       <div class="stats-num" id="event-count">0</div>
     </div>
 
-    <!-- Botão de localização (flutuante) -->
-    <button class="btn-location" id="btn-location" onclick="centralizarMinhaLocalizacao()" title="Mostrar minha localização">
+    <!-- Botões flutuantes -->
+    <button class="btn-floating btn-notif" id="btn-notif" onclick="alternarNotificacoes()" title="Notificações">
+      🔔
+    </button>
+    <button class="btn-floating btn-location" id="btn-location" onclick="centralizarMinhaLocalizacao()" title="Mostrar minha localização">
       <span id="btn-location-icon">📍</span>
     </button>
+  </div>
+
+  <!-- Modal de explicação de notificações -->
+  <div class="notif-modal" id="notif-modal">
+    <div class="notif-modal-content">
+      <div class="notif-modal-icon">🔔</div>
+      <h2 class="notif-modal-title">Receber alertas</h2>
+      <p class="notif-modal-desc">
+        Avisamos você quando:
+      </p>
+      <ul class="notif-modal-list">
+        <li>🔥 Algum evento ficar "estourado" pelos motoristas</li>
+        <li>📍 Aparecer evento novo perto de você</li>
+        <li>⏰ Evento começar em breve</li>
+      </ul>
+      <p class="notif-modal-foot">
+        Máximo 5 avisos por hora. Pode desligar a qualquer momento.
+      </p>
+      <div class="notif-modal-actions">
+        <button class="btn-modal-cancel" onclick="fecharModalNotif()">Agora não</button>
+        <button class="btn-modal-confirm" onclick="ativarNotificacoes()">Ativar 🔔</button>
+      </div>
+    </div>
   </div>
 
   <!-- BOTTOM SHEET (card do evento) -->
@@ -592,12 +697,19 @@ function conectarFirebase() {
 
   // Escuta a coleção 'eventos' em tempo real
   onSnapshot(collection(db, 'eventos'), (snapshot) => {
-    EVENTOS = snapshot.docs.map(doc => ({
-      id: doc.id,  // ID do Firestore vira o id do evento
+    const eventosNovos = snapshot.docs.map(doc => ({
+      id: doc.id,
       ...doc.data()
     }));
 
-    // Re-renderiza o mapa com os novos dados
+    // Detecta mudanças e dispara notificações (se estiver ativado)
+    if (typeof detectarMudancasENotificar === 'function') {
+      detectarMudancasENotificar(eventosNovos);
+    }
+
+    EVENTOS = eventosNovos;
+
+    // Re-renderiza o mapa
     const filtroAtivo = document.querySelector('.filter-btn.active');
     if (filtroAtivo) renderMarkers(filtroAtivo.dataset.filter);
     console.log('🔥 Eventos atualizados:', EVENTOS.length);
@@ -1192,7 +1304,271 @@ function centralizarMinhaLocalizacao() {
   map.setView([minhaLocalizacao.lat, minhaLocalizacao.lng], 15);
 }
 
+/* =====================================================
+   SISTEMA DE NOTIFICAÇÕES PUSH
+   ===================================================== */
+
+let swRegistration = null;
+let notificacoesAtivas = localStorage.getItem('zq_notif_ativas') === 'true';
+let estadoAnteriorEventos = {};  // pra detectar mudanças
+const RAIO_NOTIFICACAO_KM = 3;
+const MAX_NOTIFICACOES_HORA = 5;
+const TEMPO_ENTRE_NOTIF_EVENTO = 30 * 60 * 1000;  // 30 min
+
+// Histórico de notificações enviadas (anti-spam)
+function getHistoricoNotif() {
+  return JSON.parse(localStorage.getItem('zq_notif_historico') || '[]');
+}
+function salvarHistoricoNotif(historico) {
+  // Mantém só notificações da última hora
+  const agora = Date.now();
+  const UMA_HORA = 60 * 60 * 1000;
+  const filtrado = historico.filter(h => (agora - h.timestamp) < UMA_HORA);
+  localStorage.setItem('zq_notif_historico', JSON.stringify(filtrado));
+}
+
+// Registra o Service Worker (necessário pra notificações)
+async function registrarServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    console.warn('Service Worker não suportado nesse navegador');
+    return null;
+  }
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    console.log('[SW] Registrado:', reg);
+    swRegistration = reg;
+
+    // Listener pra quando clicar na notificação (abrir evento específico)
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'abrir_evento') {
+        const ev = EVENTOS.find(e => e.id === event.data.eventoId);
+        if (ev) {
+          map.setView([ev.lat, ev.lng], 16);
+          setTimeout(() => showEvento(ev), 300);
+        }
+      }
+    });
+
+    return reg;
+  } catch (err) {
+    console.error('[SW] Erro ao registrar:', err);
+    return null;
+  }
+}
+
+// Botão de notificação clicado
+function alternarNotificacoes() {
+  if (notificacoesAtivas) {
+    // Já tá ativo: pergunta se quer desligar
+    if (confirm('Desativar notificações?')) {
+      desativarNotificacoes();
+    }
+  } else {
+    // Não tá ativo: mostra modal explicando
+    abrirModalNotif();
+  }
+}
+
+function abrirModalNotif() {
+  document.getElementById('notif-modal').classList.add('show');
+}
+
+function fecharModalNotif() {
+  document.getElementById('notif-modal').classList.remove('show');
+}
+
+async function ativarNotificacoes() {
+  fecharModalNotif();
+
+  if (!('Notification' in window)) {
+    showToast('Seu navegador não suporta notificações');
+    return;
+  }
+
+  // Pede permissão do navegador
+  const permissao = await Notification.requestPermission();
+
+  if (permissao === 'granted') {
+    notificacoesAtivas = true;
+    localStorage.setItem('zq_notif_ativas', 'true');
+    document.getElementById('btn-notif').classList.add('enabled');
+    showToast('🔔 Notificações ativadas!');
+
+    // Garante que SW tá registrado
+    if (!swRegistration) {
+      await registrarServiceWorker();
+    }
+
+    // Notificação de teste pra confirmar
+    setTimeout(() => {
+      enviarNotificacao(
+        '🔥 Zona Quente RJ',
+        'Notificações ativadas! Avisaremos quando algo quente rolar.',
+        null,
+        'boas-vindas'
+      );
+    }, 500);
+  } else if (permissao === 'denied') {
+    showToast('Permissão negada. Ative nas configurações do navegador.');
+  }
+}
+
+function desativarNotificacoes() {
+  notificacoesAtivas = false;
+  localStorage.setItem('zq_notif_ativas', 'false');
+  document.getElementById('btn-notif').classList.remove('enabled');
+  showToast('Notificações desativadas');
+}
+
+// Função principal que dispara a notificação
+function enviarNotificacao(titulo, corpo, eventoId, tag) {
+  if (!notificacoesAtivas) return false;
+  if (!swRegistration) return false;
+  if (Notification.permission !== 'granted') return false;
+
+  // Anti-spam: verifica limite por hora
+  const historico = getHistoricoNotif();
+  const agora = Date.now();
+  const UMA_HORA = 60 * 60 * 1000;
+  const recentes = historico.filter(h => (agora - h.timestamp) < UMA_HORA);
+
+  if (recentes.length >= MAX_NOTIFICACOES_HORA) {
+    console.log('[Notif] Limite por hora atingido, pulando');
+    return false;
+  }
+
+  // Anti-spam: mesmo evento não notifica 2x em 30 min
+  if (eventoId) {
+    const mesmoEvento = historico.find(h =>
+      h.eventoId === eventoId && (agora - h.timestamp) < TEMPO_ENTRE_NOTIF_EVENTO
+    );
+    if (mesmoEvento) {
+      console.log('[Notif] Evento já notificado recentemente, pulando');
+      return false;
+    }
+  }
+
+  // Manda pro Service Worker exibir
+  if (swRegistration.active) {
+    swRegistration.active.postMessage({
+      type: 'mostrar_notificacao',
+      titulo,
+      corpo,
+      eventoId,
+      tag
+    });
+  }
+
+  // Salva no histórico
+  historico.push({ timestamp: agora, eventoId, tag });
+  salvarHistoricoNotif(historico);
+
+  return true;
+}
+
+/* =====================================================
+   DETECTOR DE MUDANÇAS — DISPARA NOTIFICAÇÕES
+   Roda toda vez que o Firebase atualiza os eventos
+   ===================================================== */
+function detectarMudancasENotificar(eventosNovos) {
+  if (!notificacoesAtivas) return;
+
+  eventosNovos.forEach(ev => {
+    const estadoAntigo = estadoAnteriorEventos[ev.id];
+
+    // 1. EVENTO NOVO — apareceu agora e está perto de mim
+    if (!estadoAntigo && ev.id) {
+      // Só notifica se for criado nos últimos 5 min (evita notificar tudo na primeira carga)
+      const idadeEvento = ev.criado_em ? (Date.now() - ev.criado_em) : Infinity;
+      if (idadeEvento < 5 * 60 * 1000 && minhaLocalizacao) {
+        const dist = calcularDistanciaKm(minhaLocalizacao.lat, minhaLocalizacao.lng, ev.lat, ev.lng);
+        if (dist <= RAIO_NOTIFICACAO_KM) {
+          enviarNotificacao(
+            '📍 Evento novo perto de você',
+            `${ev.nome} em ${ev.local} (${dist < 1 ? Math.round(dist * 1000) + 'm' : dist.toFixed(1) + 'km'})`,
+            ev.id,
+            'evento-novo-' + ev.id
+          );
+        }
+      }
+    }
+
+    // 2. STATUS MUDOU PRA ESTOURADO (pelos votos)
+    if (estadoAntigo) {
+      const statusAntigo = estadoAntigo._statusVisual || estadoAntigo.status;
+      const statusNovo = calcularStatusAgregado(ev);
+
+      if (statusAntigo !== 'estourado' && statusNovo === 'estourado') {
+        const totalVotos = contarFeedbacksRecentes(ev);
+        if (totalVotos >= 3) {  // só notifica com consenso (3+ votos)
+          let distStr = '';
+          if (minhaLocalizacao) {
+            const dist = calcularDistanciaKm(minhaLocalizacao.lat, minhaLocalizacao.lng, ev.lat, ev.lng);
+            distStr = ` · ${dist < 1 ? Math.round(dist * 1000) + 'm' : dist.toFixed(1) + 'km'} de você`;
+          }
+          enviarNotificacao(
+            '🔥 Estourou!',
+            `${ev.nome} em ${ev.local}${distStr} — ${totalVotos} motoristas reportaram`,
+            ev.id,
+            'estourado-' + ev.id
+          );
+        }
+      }
+    }
+
+    // 3. EVENTO COMEÇANDO EM ~30 MIN (pra eventos pontuais)
+    if (ev.recorrencia === 'pontual' && ev.fim_timestamp && ev.inicio) {
+      // Pega timestamp do início do evento
+      const [hIni, mIni] = ev.inicio.split(':').map(Number);
+      const [hFim, mFim] = ev.fim.split(':').map(Number);
+      // O fim_timestamp já está calculado; deduz início como (fim - duração)
+      // Calcula duração em ms
+      let duracao;
+      if (hFim < hIni || (hFim === hIni && mFim < mIni)) {
+        // passa da meia-noite
+        duracao = ((24 - hIni) + hFim) * 60 * 60 * 1000 + (mFim - mIni) * 60 * 1000;
+      } else {
+        duracao = (hFim - hIni) * 60 * 60 * 1000 + (mFim - mIni) * 60 * 1000;
+      }
+      const inicioTimestamp = ev.fim_timestamp - duracao;
+      const tempoAteInicio = inicioTimestamp - Date.now();
+
+      // Notifica se faltam entre 25-35 min pro início (janela de 10 min pra pegar)
+      if (tempoAteInicio > 25 * 60 * 1000 && tempoAteInicio < 35 * 60 * 1000) {
+        // Só se for perto
+        if (minhaLocalizacao) {
+          const dist = calcularDistanciaKm(minhaLocalizacao.lat, minhaLocalizacao.lng, ev.lat, ev.lng);
+          if (dist <= RAIO_NOTIFICACAO_KM * 2) {  // raio maior pra começo (até 6km)
+            enviarNotificacao(
+              '⏰ Evento começando em 30 min',
+              `${ev.nome} em ${ev.local} · ${dist.toFixed(1)}km`,
+              ev.id,
+              'comecando-' + ev.id
+            );
+          }
+        }
+      }
+    }
+
+    // Atualiza estado pra próxima checagem
+    estadoAnteriorEventos[ev.id] = {
+      ...ev,
+      _statusVisual: calcularStatusAgregado(ev)
+    };
+  });
+}
+
 /* ===== INICIALIZAÇÃO ===== */
+// Registra Service Worker assim que o app carrega
+registrarServiceWorker();
+
+// Se já tinha ativado antes, aplica visualmente
+if (notificacoesAtivas && Notification.permission === 'granted') {
+  document.getElementById('btn-notif').classList.add('enabled');
+} else {
+  notificacoesAtivas = false;  // reset se permissão foi revogada
+}
+
 // Espera o Firebase carregar antes de conectar
 if (window.zqFirebase) {
   conectarFirebase();
