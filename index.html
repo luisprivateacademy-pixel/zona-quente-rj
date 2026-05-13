@@ -656,25 +656,25 @@ function showEvento(ev) {
     </div>` : ''}
 
     <div class="sheet-actions">
-      <button class="btn-primary" style="background:${cfg.color};" onclick="navegarPara(${ev.id})">
+      <button class="btn-primary" style="background:${cfg.color};" onclick="navegarPara('${ev.id}')">
         🧭 Ir para essa região
       </button>
-      <button class="btn-secondary" onclick="compartilhar(${ev.id})">📤</button>
+      <button class="btn-secondary" onclick="compartilhar('${ev.id}')">📤</button>
     </div>
 
     <div class="feedback-section">
       <div class="feedback-title">Como tá lá?</div>
       <div class="feedback-buttons">
-        <button class="feedback-btn" onclick="darFeedback(${ev.id}, 'fraco')">
+        <button class="feedback-btn" onclick="darFeedback('${ev.id}', 'fraco')">
           <span class="emoji">🥶</span>Tá fraco
         </button>
-        <button class="feedback-btn" onclick="darFeedback(${ev.id}, 'medio')">
+        <button class="feedback-btn" onclick="darFeedback('${ev.id}', 'medio')">
           <span class="emoji">😐</span>Médio
         </button>
-        <button class="feedback-btn" onclick="darFeedback(${ev.id}, 'bom')">
+        <button class="feedback-btn" onclick="darFeedback('${ev.id}', 'bom')">
           <span class="emoji">🙂</span>Bom
         </button>
-        <button class="feedback-btn" onclick="darFeedback(${ev.id}, 'estourado')">
+        <button class="feedback-btn" onclick="darFeedback('${ev.id}', 'estourado')">
           <span class="emoji">🔥</span>Estourado
         </button>
       </div>
@@ -869,7 +869,7 @@ function abrirListaEventos(somenteQuentes = false) {
   content.innerHTML = evs.map(ev => {
     const cfg = STATUS_CONFIG[ev.status];
     return `
-      <div class="event-card" onclick="abrirEventoDoMapa(${ev.id})">
+      <div class="event-card" onclick="abrirEventoDoMapa('${ev.id}')">
         <div class="event-card-header">
           <div>
             <div class="event-card-title">${ev.nome}</div>
