@@ -581,21 +581,62 @@ function makeMarkerIcon(status) {
   });
 }
 
+/* =====================================================
+   FILTRO DE EVENTOS POR EXPIRAÇÃO
+   - Recorrente: sempre aparece
+   - Pontual: aparece até 1h depois do fim
+   - Aviso visual (opacidade): nos últimos 30min antes do fim
+   ===================================================== */
+function eventoEstaAtivo(ev) {
+  // Recorrentes sempre ativos
+  if (ev.recorrencia === 'recorrente') return true;
+
+  // Sem fim_timestamp = legado/recorrente
+  if (!ev.fim_timestamp) return true;
+
+  const agora = Date.now();
+  const UMA_HORA = 60 * 60 * 1000;
+
+  // Expirou se já passou mais de 1h depois do fim
+  return (agora - ev.fim_timestamp) < UMA_HORA;
+}
+
+function eventoEstaTerminando(ev) {
+  // Recorrentes nunca "terminam"
+  if (ev.recorrencia === 'recorrente' || !ev.fim_timestamp) return false;
+
+  const agora = Date.now();
+  const TRINTA_MIN = 30 * 60 * 1000;
+  const tempoAteFim = ev.fim_timestamp - agora;
+
+  // Tá nos últimos 30min ou já passou do fim
+  return tempoAteFim < TRINTA_MIN;
+}
+
 function renderMarkers(filtro) {
   // Limpa marcadores antigos
   markers.forEach(m => map.removeLayer(m));
   markers = [];
 
+  // 1. Filtra eventos ativos (não expirados)
+  const ativos = EVENTOS.filter(eventoEstaAtivo);
+
+  // 2. Aplica o filtro do botão (agora/noite/etc)
   const filtrados = filtro === 'todos'
-    ? EVENTOS
-    : EVENTOS.filter(e => e.filtros && e.filtros.includes(filtro));
+    ? ativos
+    : ativos.filter(e => e.filtros && e.filtros.includes(filtro));
 
   filtrados.forEach(ev => {
-    // Status agregado = considera feedbacks dos motoristas (crowdsourcing)
     const statusAgregado = calcularStatusAgregado(ev);
-    ev._statusVisual = statusAgregado;  // guarda pra usar no card também
+    ev._statusVisual = statusAgregado;
 
-    const m = L.marker([ev.lat, ev.lng], { icon: makeMarkerIcon(statusAgregado) }).addTo(map);
+    // Eventos terminando ficam com opacidade reduzida
+    const terminando = eventoEstaTerminando(ev);
+    const m = L.marker([ev.lat, ev.lng], {
+      icon: makeMarkerIcon(statusAgregado),
+      opacity: terminando ? 0.55 : 1
+    }).addTo(map);
+
     m.on('click', () => showEvento(ev));
     markers.push(m);
   });
@@ -947,6 +988,14 @@ if (window.zqFirebase) {
 } else {
   window.addEventListener('firebase-ready', conectarFirebase);
 }
+
+// A cada 60 segundos, re-renderiza pra atualizar quem expirou
+setInterval(() => {
+  const filtroAtivo = document.querySelector('.filter-btn.active');
+  if (filtroAtivo && EVENTOS.length > 0) {
+    renderMarkers(filtroAtivo.dataset.filter);
+  }
+}, 60000);
 
 console.log('🔥 Zona Quente RJ carregando...');
 </script>
