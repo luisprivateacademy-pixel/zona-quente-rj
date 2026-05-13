@@ -529,7 +529,16 @@
       </div>
     </div>
 
-    <div class="row">
+    <label>🔁 Tipo de evento</label>
+    <select id="recorrencia" onchange="atualizarTipoEvento()">
+      <option value="pontual">📅 Pontual (show, jogo) — expira após o fim</option>
+      <option value="recorrente">🔁 Recorrente (bar, restaurante) — não expira</option>
+    </select>
+    <div class="help" id="ajuda-recorrencia" style="margin-top: 8px;">
+      💡 <strong>Pontual:</strong> some do app 1h depois do horário "Fim". Use pra shows, jogos, eventos com data certa.
+    </div>
+
+    <div class="row" id="row-horarios">
       <div>
         <label>Início *</label>
         <input id="inicio" type="time" value="20:00">
@@ -538,6 +547,12 @@
         <label>Fim *</label>
         <input id="fim" type="time" value="02:00">
       </div>
+    </div>
+
+    <label>📆 Data do evento</label>
+    <input id="data_evento" type="date">
+    <div class="help" style="margin-top: 6px;">
+      💡 Deixe em branco pra "hoje". O sistema usa essa data + hora pra saber quando expira.
     </div>
 
     <div class="row">
@@ -967,6 +982,30 @@ async function salvarEvento() {
 
   const inicio = document.getElementById('inicio').value || '20:00';
   const fim = document.getElementById('fim').value || '02:00';
+  // Data do evento — se não preencher, usa hoje
+  const dataInput = document.getElementById('data_evento').value;
+  const dataEvento = dataInput || new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+  const recorrencia = document.getElementById('recorrencia').value;
+
+  // Calcula timestamp do fim (pra saber quando expirar)
+  let fimTimestamp = null;
+  if (recorrencia === 'pontual') {
+    // Combina data + hora fim
+    let dataFim = dataEvento;
+    let [hFim, mFim] = fim.split(':').map(Number);
+    let [hIni, mIni] = inicio.split(':').map(Number);
+    // Se o "fim" é antes do "início" (ex: 22:00 -> 02:00), o fim é no dia seguinte
+    let fimDate;
+    if (hFim < hIni || (hFim === hIni && mFim < mIni)) {
+      const d = new Date(dataEvento + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      dataFim = d.toISOString().split('T')[0];
+    }
+    fimDate = new Date(dataFim + 'T' + fim + ':00');
+    fimTimestamp = fimDate.getTime();
+  }
+
   const dadosEvento = {
     nome,
     local: localSelecionado.nome,
@@ -976,6 +1015,9 @@ async function salvarEvento() {
     status: document.getElementById('status').value,
     inicio,
     fim,
+    data_evento: dataEvento,
+    recorrencia,            // 'pontual' ou 'recorrente'
+    fim_timestamp: fimTimestamp,  // quando expira (null se recorrente)
     publico: document.getElementById('publico').value || 'sem dado',
     motivo: document.getElementById('motivo').value || 'Sem descrição',
     tipo_corrida: document.getElementById('tipo_corrida').value,
@@ -1019,6 +1061,9 @@ function editarEvento(id) {
   document.getElementById('tipo_corrida').value = ev.tipo_corrida;
   document.getElementById('publico').value = ev.publico === 'sem dado' ? '' : ev.publico;
   document.getElementById('motivo').value = ev.motivo === 'Sem descrição' ? '' : ev.motivo;
+  document.getElementById('recorrencia').value = ev.recorrencia || 'pontual';
+  document.getElementById('data_evento').value = ev.data_evento || '';
+  atualizarTipoEvento();
   selecionarLocal(ev.local, ev.lat, ev.lng);
   document.getElementById('btn-salvar').textContent = '💾 Salvar alterações';
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1083,6 +1128,9 @@ function limparForm() {
   document.getElementById('status').value = 'media';
   document.getElementById('tipo').value = 'show';
   document.getElementById('tipo_corrida').value = 'mista';
+  document.getElementById('recorrencia').value = 'pontual';
+  document.getElementById('data_evento').value = '';
+  atualizarTipoEvento();
   localSelecionado = null;
   document.getElementById('selected-place').classList.remove('show');
   document.getElementById('mini-map-wrap').classList.remove('show');
@@ -1285,7 +1333,25 @@ document.getElementById('login-email').addEventListener('keypress', (e) => {
   }
 });
 
+// Atualiza visual quando muda tipo de evento (pontual/recorrente)
+function atualizarTipoEvento() {
+  const recorrencia = document.getElementById('recorrencia').value;
+  const ajuda = document.getElementById('ajuda-recorrencia');
+  if (recorrencia === 'recorrente') {
+    ajuda.innerHTML = '💡 <strong>Recorrente:</strong> não expira automaticamente. Use pra bares, restaurantes, pontos fixos. Você precisa remover manualmente quando quiser.';
+    ajuda.style.background = '#2e1f0d';
+    ajuda.style.borderLeftColor = '#facc15';
+    ajuda.style.color = '#fde68a';
+  } else {
+    ajuda.innerHTML = '💡 <strong>Pontual:</strong> some do app 1h depois do horário "Fim". Use pra shows, jogos, eventos com data certa.';
+    ajuda.style.background = '#1f2e1a';
+    ajuda.style.borderLeftColor = '#4ade80';
+    ajuda.style.color = '#aaffcc';
+  }
+}
+
 renderFavoritos();
+atualizarTipoEvento();
 
 // Inicia o sistema de autenticação
 iniciarAuth();
