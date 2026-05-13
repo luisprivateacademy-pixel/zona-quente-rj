@@ -7,8 +7,22 @@
 <meta name="description" content="Zona Quente RJ - Mapa em tempo real para motoristas de aplicativo no Rio de Janeiro. Veja onde estão os eventos e as melhores regiões para corridas.">
 <title>Zona Quente RJ — Mapa para motoristas</title>
 
-<!-- PWA: permite "instalar" o site como app no celular -->
-<link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlpvbmEgUXVlbnRlIFJKIiwKICAic2hvcnRfbmFtZSI6ICJab25hUXVlbnRlIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwZDBkMGQiLAogICJ0aGVtZV9jb2xvciI6ICIjMGQwZDBkIgp9">
+<!-- PWA: ícone na tela inicial -->
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" sizes="64x64" href="/icons/favicon.png">
+
+<!-- iOS / iPhone (instalação na tela de início) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zona Quente">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="/icons/icon-120.png">
+
+<!-- Android Chrome -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Zona Quente RJ">
 
 <!-- Leaflet: biblioteca de mapas gratuita (alternativa ao Google Maps) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
