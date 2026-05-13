@@ -552,7 +552,7 @@ const STATUS_CONFIG = {
 };
 
 /* ===== FEEDBACK STORAGE (em memória, depois vira backend) ===== */
-const feedbacks = {}; // { eventoId: [{ tipo, timestamp }, ...] }
+// feedbacks agora ficam no Firebase, não em memória local
 
 /* ===== INICIALIZAÇÃO DO MAPA ===== */
 const map = L.map('map', {
@@ -588,10 +588,14 @@ function renderMarkers(filtro) {
 
   const filtrados = filtro === 'todos'
     ? EVENTOS
-    : EVENTOS.filter(e => e.filtros.includes(filtro));
+    : EVENTOS.filter(e => e.filtros && e.filtros.includes(filtro));
 
   filtrados.forEach(ev => {
-    const m = L.marker([ev.lat, ev.lng], { icon: makeMarkerIcon(ev.status) }).addTo(map);
+    // Status agregado = considera feedbacks dos motoristas (crowdsourcing)
+    const statusAgregado = calcularStatusAgregado(ev);
+    ev._statusVisual = statusAgregado;  // guarda pra usar no card também
+
+    const m = L.marker([ev.lat, ev.lng], { icon: makeMarkerIcon(statusAgregado) }).addTo(map);
     m.on('click', () => showEvento(ev));
     markers.push(m);
   });
@@ -601,7 +605,10 @@ function renderMarkers(filtro) {
 
 /* ===== CARD DE EVENTO ===== */
 function showEvento(ev) {
-  const cfg = STATUS_CONFIG[ev.status];
+  // Usa o status agregado (com feedback) ao invés do original
+  const statusVisual = ev._statusVisual || calcularStatusAgregado(ev);
+  const cfg = STATUS_CONFIG[statusVisual];
+  const totalFeedbacks = contarFeedbacksRecentes(ev);
   const sheet = document.getElementById('sheet');
   const empty = document.getElementById('sheet-empty');
   const content = document.getElementById('sheet-content');
@@ -638,6 +645,15 @@ function showEvento(ev) {
       <div class="sheet-reason-label">Por que está acontecendo</div>
       <div class="sheet-reason-text">${ev.motivo}</div>
     </div>
+
+    ${totalFeedbacks > 0 ? `
+    <div style="background:#1a1a1a;padding:10px 12px;border-radius:8px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;">👥 Feedback dos motoristas (última 1h)</div>
+        <div style="color:#fff;font-size:13px;font-weight:600;margin-top:3px;">${totalFeedbacks} ${totalFeedbacks === 1 ? 'voto' : 'votos'} recentes</div>
+      </div>
+      <div style="color:${cfg.fg};font-size:11px;font-weight:600;padding:4px 10px;background:${cfg.bg};border-radius:100px;">${cfg.label.replace(' 🔥', '')}</div>
+    </div>` : ''}
 
     <div class="sheet-actions">
       <button class="btn-primary" style="background:${cfg.color};" onclick="navegarPara(${ev.id})">
@@ -687,6 +703,12 @@ function compartilhar(id) {
   }
 }
 
+/* =====================================================
+   FEEDBACK COMPARTILHADO ENTRE MOTORISTAS
+   ===================================================== */
+
+const COOLDOWN_FEEDBACK_MS = 5 * 60 * 1000;  // 5 minutos entre votos no mesmo evento
+
 async function darFeedback(id, tipo) {
   const labels = {
     fraco: 'Marcado como FRACO',
@@ -695,60 +717,113 @@ async function darFeedback(id, tipo) {
     estourado: 'Marcado como ESTOURADO 🔥'
   };
 
-  // Salva o feedback no Firebase (contador por tipo)
-  try {
-    if (window.zqFirebase) {
-      const { db, doc, updateDoc, increment } = window.zqFirebase;
-      const eventoRef = doc(db, 'eventos', String(id));
-      await updateDoc(eventoRef, {
-        ['feedback_' + tipo]: increment(1),
-        ultimo_feedback: Date.now()
-      });
+  // ANTI-SPAM: bloqueia votos repetidos no mesmo evento (cooldown de 5min)
+  const ultimoVoto = localStorage.getItem('zq_voto_' + id);
+  if (ultimoVoto) {
+    const tempoPassado = Date.now() - parseInt(ultimoVoto);
+    if (tempoPassado < COOLDOWN_FEEDBACK_MS) {
+      const minRestantes = Math.ceil((COOLDOWN_FEEDBACK_MS - tempoPassado) / 60000);
+      showToast(`Você já votou. Tente de novo em ${minRestantes} min`);
+      return;
     }
-    showToast(labels[tipo] + ' — valeu!');
+  }
+
+  if (!window.zqFirebase) {
+    showToast('Aguarde conectar...');
+    return;
+  }
+
+  // Adiciona feedback no Firebase (lista de votos recentes + último timestamp)
+  try {
+    const { db, doc, updateDoc } = window.zqFirebase;
+    const eventoRef = doc(db, 'eventos', String(id));
+
+    // Pega lista atual de feedbacks recentes do evento
+    const ev = EVENTOS.find(e => e.id === id);
+    let feedbacksRecentes = (ev && ev.feedbacks_recentes) ? [...ev.feedbacks_recentes] : [];
+
+    // Adiciona o novo voto
+    feedbacksRecentes.push({ tipo, timestamp: Date.now() });
+
+    // Limpa feedbacks com mais de 1h (não conta mais)
+    const UMA_HORA = 60 * 60 * 1000;
+    const agora = Date.now();
+    feedbacksRecentes = feedbacksRecentes.filter(f => (agora - f.timestamp) < UMA_HORA);
+
+    // Salva no Firebase — vai disparar onSnapshot e atualizar pra todos
+    await updateDoc(eventoRef, {
+      feedbacks_recentes: feedbacksRecentes,
+      ultimo_feedback: Date.now()
+    });
+
+    // Marca cooldown LOCAL pra esse motorista
+    localStorage.setItem('zq_voto_' + id, Date.now().toString());
+
+    showToast(labels[tipo] + ' — valeu! 👊');
   } catch (err) {
     console.error('Erro ao salvar feedback:', err);
     showToast('Erro ao enviar. Tenta de novo.');
   }
 }
 
-/* ===== LÓGICA: MÉDIA PONDERADA POR TEMPO =====
-   Feedback dos últimos 30 minutos pesa mais.
-*/
-function atualizarStatusPorFeedback(eventoId) {
-  const fbs = feedbacks[eventoId];
-  if (!fbs || fbs.length === 0) return;
+/* =====================================================
+   CALCULA STATUS DO EVENTO BASEADO NOS FEEDBACKS RECENTES
+   - Últimos 30min: peso 100%
+   - 30min a 1h: peso decrescente (linear)
+   - Mais de 1h: ignorado
+   ===================================================== */
+function calcularStatusAgregado(evento) {
+  const feedbacks = evento.feedbacks_recentes || [];
+  if (feedbacks.length === 0) {
+    return evento.status; // sem feedback, usa o status original cadastrado
+  }
 
   const agora = Date.now();
   const TRINTA_MIN = 30 * 60 * 1000;
-
+  const UMA_HORA = 60 * 60 * 1000;
   const pesos = { fraco: 1, medio: 2, bom: 3, estourado: 4 };
+
   let somaPonderada = 0;
   let pesoTotal = 0;
+  let votosValidos = 0;
 
-  fbs.forEach(fb => {
+  feedbacks.forEach(fb => {
     const idade = agora - fb.timestamp;
-    // Recente = peso 1.0; > 30min = decai linearmente
-    const pesoTempo = idade < TRINTA_MIN ? 1.0 : Math.max(0.1, 1 - (idade / (60 * 60 * 1000)));
+    if (idade > UMA_HORA) return; // ignora >1h
+
+    let pesoTempo;
+    if (idade < TRINTA_MIN) {
+      pesoTempo = 1.0; // peso máximo
+    } else {
+      // Decai linearmente de 1.0 (30min) até 0 (60min)
+      pesoTempo = 1.0 - ((idade - TRINTA_MIN) / TRINTA_MIN);
+    }
+
     somaPonderada += pesos[fb.tipo] * pesoTempo;
     pesoTotal += pesoTempo;
+    votosValidos++;
   });
 
-  const media = somaPonderada / pesoTotal;
-  let novoStatus;
-  if (media < 1.5) novoStatus = 'baixa';
-  else if (media < 2.5) novoStatus = 'media';
-  else if (media < 3.5) novoStatus = 'alta';
-  else novoStatus = 'estourado';
+  // Se tem poucos votos válidos (<2), considera só parcialmente — mistura com status original
+  if (votosValidos === 0) return evento.status;
 
-  const ev = EVENTOS.find(e => e.id === eventoId);
-  if (ev && ev.status !== novoStatus) {
-    ev.status = novoStatus;
-    const filtroAtivo = document.querySelector('.filter-btn.active').dataset.filter;
-    renderMarkers(filtroAtivo);
-    setTimeout(() => showEvento(ev), 300);
-  }
+  const media = somaPonderada / pesoTotal;
+
+  if (media < 1.5) return 'baixa';
+  else if (media < 2.5) return 'media';
+  else if (media < 3.5) return 'alta';
+  else return 'estourado';
 }
+
+/* Função pra contar feedbacks recentes (pra mostrar no card) */
+function contarFeedbacksRecentes(evento) {
+  const feedbacks = evento.feedbacks_recentes || [];
+  const agora = Date.now();
+  const UMA_HORA = 60 * 60 * 1000;
+  return feedbacks.filter(f => (agora - f.timestamp) < UMA_HORA).length;
+}
+
+// (função antiga atualizarStatusPorFeedback removida — agora usa calcularStatusAgregado)
 
 /* ===== TOAST ===== */
 let toastTimer;
