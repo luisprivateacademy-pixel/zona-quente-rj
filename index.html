@@ -32,7 +32,8 @@
 <script type="module">
   // Importa Firebase do CDN oficial
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-  import { getFirestore, collection, onSnapshot, doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getFirestore, collection, onSnapshot, doc, updateDoc, increment, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-analytics.js";
 
   // Configuração do Firebase
   const firebaseConfig = {
@@ -41,20 +42,24 @@
     projectId: "zona-quente-rj",
     storageBucket: "zona-quente-rj.firebasestorage.app",
     messagingSenderId: "391720260616",
-    appId: "1:391720260616:web:aac6f93d541621fe32edbd"
+    appId: "1:391720260616:web:aac6f93d541621fe32edbd",
+    measurementId: "G-M07WZVKQGL"
   };
 
-  // Inicializa Firebase e expõe globalmente
+  // Inicializa Firebase + Analytics
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const analytics = getAnalytics(app);
 
   window.zqFirebase = {
-    db,
+    db, analytics,
     collection,
     onSnapshot,
     doc,
     updateDoc,
-    increment
+    increment,
+    setDoc,
+    logEvent
   };
 
   // Avisa que tá pronto
@@ -853,6 +858,7 @@ function renderMarkers(filtro) {
 
 /* ===== CARD DE EVENTO ===== */
 function showEvento(ev) {
+  logAcao('evento_visto', { evento_id: ev.id, evento_nome: ev.nome });
   // Usa o status agregado (com feedback) ao invés do original
   const statusVisual = ev._statusVisual || calcularStatusAgregado(ev);
   const cfg = STATUS_CONFIG[statusVisual];
@@ -1023,6 +1029,7 @@ async function darFeedback(id, tipo) {
 
     // Marca cooldown LOCAL pra esse motorista
     localStorage.setItem('zq_voto_' + id, Date.now().toString());
+    logAcao('feedback_dado', { tipo, evento_id: id });
 
     showToast(labels[tipo] + ' — valeu! 👊');
   } catch (err) {
@@ -1558,7 +1565,54 @@ function detectarMudancasENotificar(eventosNovos) {
   });
 }
 
-/* ===== INICIALIZAÇÃO ===== */
+/* =====================================================
+   TRACKING DE USO — MOTORISTA ÚNICO + EVENTOS
+   ===================================================== */
+
+// Gera ou recupera um ID anônimo único pro dispositivo
+function getDeviceId() {
+  let id = localStorage.getItem('zq_device_id');
+  if (!id) {
+    id = 'd_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+    localStorage.setItem('zq_device_id', id);
+  }
+  return id;
+}
+
+// Registra/atualiza dispositivo no Firestore (anônimo, sem dados pessoais)
+async function registrarUso() {
+  if (!window.zqFirebase) {
+    setTimeout(registrarUso, 1000);
+    return;
+  }
+
+  const deviceId = getDeviceId();
+  const { db, doc, setDoc } = window.zqFirebase;
+
+  try {
+    // Registra/atualiza esse dispositivo na coleção "dispositivos"
+    await setDoc(doc(db, 'dispositivos', deviceId), {
+      ultimo_acesso: Date.now(),
+      ultimo_acesso_dia: new Date().toISOString().split('T')[0],
+      notif_ativadas: notificacoesAtivas || false,
+      tem_localizacao: !!minhaLocalizacao
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Erro ao registrar uso:', err);
+  }
+}
+
+// Log de evento no Analytics + Firestore
+function logAcao(nome, dados = {}) {
+  // Google Analytics
+  if (window.zqFirebase && window.zqFirebase.logEvent) {
+    try {
+      window.zqFirebase.logEvent(window.zqFirebase.analytics, nome, dados);
+    } catch(e) {}
+  }
+}
+
+/* ===== INICIALIZAÇÃO =====
 // Registra Service Worker assim que o app carrega
 registrarServiceWorker();
 
@@ -1587,6 +1641,15 @@ setInterval(() => {
     renderMarkers(filtroAtivo.dataset.filter);
   }
 }, 60000);
+
+// Registra uso ao abrir o app + a cada 5 min de uso (heartbeat)
+setTimeout(registrarUso, 3000);
+setInterval(registrarUso, 5 * 60 * 1000);
+
+// Log de eventos chave no analytics
+setTimeout(() => {
+  logAcao('app_aberto', { tem_localizacao: !!minhaLocalizacao });
+}, 2000);
 
 console.log('🔥 Zona Quente RJ carregando...');
 </script>
