@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📊 Dashboard · Zona Quente RJ</title>
+<meta name="theme-color" content="#0d0d0d">
+<link rel="icon" type="image/png" sizes="64x64" href="/icons/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCcQnWQ9zd17SK9RDiXAQrOBgPVekznS5M",
+    authDomain: "zona-quente-rj.firebaseapp.com",
+    projectId: "zona-quente-rj",
+    storageBucket: "zona-quente-rj.firebasestorage.app",
+    messagingSenderId: "391720260616",
+    appId: "1:391720260616:web:aac6f93d541621fe32edbd",
+    measurementId: "G-M07WZVKQGL"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  window.zqDashboard = {
+    db, auth, collection, getDocs, onSnapshot,
+    signInWithEmailAndPassword, onAuthStateChanged, signOut
+  };
+
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d0d0d;
+    color: #fff;
+    padding: 16px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  /* === TELA DE LOGIN === */
+  .login-screen {
+    position: fixed; inset: 0;
+    background: #0d0d0d;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-box {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .login-logo { text-align: center; margin-bottom: 22px; }
+  .login-logo .icon {
+    width: 56px; height: 56px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6, #1e3a8a);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+  .login-logo h1 { font-size: 20px; font-weight: 600; }
+  .login-logo p { font-size: 12px; color: #888; margin-top: 2px; }
+  .login-box label {
+    display: block; font-size: 11px; color: #aaa;
+    margin-bottom: 5px; margin-top: 14px;
+    font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .login-box input {
+    width: 100%; padding: 10px 12px;
+    background: #0d0d0d; border: 1px solid #2a2a2a;
+    border-radius: 8px; color: #fff; font-size: 14px;
+  }
+  .login-box input:focus { border-color: #3b82f6; outline: none; }
+  .btn {
+    width: 100%; padding: 12px; margin-top: 18px;
+    background: #3b82f6; color: #fff; border: none;
+    border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+  .login-error {
+    background: #2a1414; border: 1px solid #dc2626;
+    color: #fca5a5; padding: 10px 14px; border-radius: 8px;
+    font-size: 12px; margin-top: 14px; display: none;
+  }
+  .login-error.show { display: block; }
+
+  /* Dashboard content */
+  .app-content { display: none; }
+  .app-content.authenticated { display: block; }
+
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px; padding-bottom: 16px;
+    border-bottom: 1px solid #262626;
+  }
+  .header h1 { font-size: 22px; font-weight: 600; }
+  .header .subtitle { color: #888; font-size: 13px; margin-top: 4px; }
+  .user-info {
+    background: #141414; border: 1px solid #262626;
+    border-radius: 100px; padding: 6px 12px; font-size: 11px;
+    color: #aaa; display: flex; align-items: center; gap: 8px;
+  }
+  .user-info button {
+    background: transparent; border: none; color: #3b82f6;
+    cursor: pointer; font-size: 11px; font-weight: 500;
+  }
+
+  /* Cards de métricas */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .metric-card {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .metric-card .label {
+    color: #888; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    font-weight: 600; margin-bottom: 8px;
+  }
+  .metric-card .value {
+    color: #fff; font-size: 32px;
+    font-weight: 700; line-height: 1;
+  }
+  .metric-card .subvalue {
+    color: #666; font-size: 11px; margin-top: 6px;
+  }
+  .metric-card.highlight { border-color: #3b82f6; background: linear-gradient(135deg, #141414, #1a2540); }
+  .metric-card.highlight .value { color: #93c5fd; }
+
+  /* Seções */
+  .section {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .section h2 {
+    font-size: 15px; font-weight: 600;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* Lista de top eventos */
+  .top-list { display: flex; flex-direction: column; gap: 8px; }
+  .top-item {
+    background: #0d0d0d;
+    border: 1px solid #1f1f1f;
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .top-item .rank {
+    font-size: 18px;
+    color: #FF6B35;
+    font-weight: 700;
+    min-width: 30px;
+  }
+  .top-item .info { flex: 1; }
+  .top-item .info strong { display: block; font-size: 13px; }
+  .top-item .info small { color: #888; font-size: 11px; }
+  .top-item .counts {
+    display: flex; gap: 8px; font-size: 11px;
+  }
+  .count-badge {
+    background: #1f1f1f;
+    padding: 3px 8px;
+    border-radius: 100px;
+    color: #aaa;
+  }
+
+  /* Gráfico de barras simples */
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    height: 120px;
+    gap: 4px;
+    padding: 8px 0;
+  }
+  .bar {
+    flex: 1;
+    background: linear-gradient(180deg, #3b82f6, #1e3a8a);
+    border-radius: 4px 4px 0 0;
+    min-height: 4px;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .bar:hover { background: linear-gradient(180deg, #60a5fa, #3b82f6); }
+  .bar-labels {
+    display: flex; gap: 4px; margin-top: 4px;
+  }
+  .bar-label {
+    flex: 1; text-align: center;
+    font-size: 9px; color: #666;
+  }
+
+  /* Loading */
+  .loading {
+    color: #666; font-size: 13px;
+    text-align: center; padding: 40px 0;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex; gap: 4px;
+    background: #0d0d0d;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 14px;
+  }
+  .tab {
+    flex: 1; padding: 7px;
+    background: transparent; border: none;
+    color: #888; font-size: 12px;
+    cursor: pointer; border-radius: 6px;
+    font-weight: 500;
+  }
+  .tab.active { background: #3b82f6; color: #fff; }
+
+  /* Empty state */
+  .empty {
+    color: #555; font-size: 12px;
+    text-align: center; padding: 24px;
+    font-style: italic;
+  }
+
+  /* Refresh button */
+  .refresh {
+    background: transparent;
+    border: 1px solid #333;
+    color: #aaa;
+    padding: 6px 12px;
+    border-radius: 100px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .refresh:hover { border-color: #3b82f6; color: #3b82f6; }
+
+  .legend-link {
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-top: 14px;
+    font-size: 12px;
+    color: #888;
+    text-align: center;
+  }
+  .legend-link a {
+    color: #3b82f6;
+    text-decoration: none;
+  }
+  .legend-link a:hover { text-decoration: underline; }
+
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TELA DE LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">📊</div>
+      <h1>Dashboard</h1>
+      <p>Zona Quente RJ — métricas internas</p>
+    </div>
+
+    <label>Email</label>
+    <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+
+    <label>Senha</label>
+    <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+
+    <div class="login-error" id="login-error"></div>
+
+    <button class="btn" onclick="fazerLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- CONTEÚDO -->
+<div class="app-content" id="app-content">
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>📊 Dashboard</h1>
+        <div class="subtitle">Métricas de uso em tempo real</div>
+      </div>
+      <div class="user-info">
+        <span id="user-email">...</span>
+        <button onclick="fazerLogout()">Sair</button>
+      </div>
+    </div>
+
+    <!-- Métricas principais -->
+    <div class="grid">
+      <div class="metric-card highlight">
+        <div class="label">Motoristas únicos hoje</div>
+        <div class="value" id="m-hoje">—</div>
+        <div class="subvalue" id="m-hoje-sub"></div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Última semana</div>
+        <div class="value" id="m-semana">—</div>
+        <div class="subvalue">7 dias atrás</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Total cadastrado</div>
+        <div class="value" id="m-total">—</div>
+        <div class="subvalue">desde o início</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Notificações ativas</div>
+        <div class="value" id="m-notif">—</div>
+        <div class="subvalue" id="m-notif-sub"></div>
+      </div>
+    </div>
+
+    <!-- Eventos e votos -->
+    <div class="grid">
+      <div class="metric-card">
+        <div class="label">Eventos ativos</div>
+        <div class="value" id="m-eventos">—</div>
+        <div class="subvalue" id="m-eventos-sub"></div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Votos totais hoje</div>
+        <div class="value" id="m-votos-hoje">—</div>
+        <div class="subvalue">últimas 24h</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Votos da semana</div>
+        <div class="value" id="m-votos-semana">—</div>
+        <div class="subvalue">últimos 7 dias</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Compromisso</div>
+        <div class="value" id="m-compromisso">—</div>
+        <div class="subvalue">votos/motorista</div>
+      </div>
+    </div>
+
+    <!-- Gráfico de uso por dia -->
+    <div class="section">
+      <h2>📈 Uso nos últimos 7 dias</h2>
+      <div class="bar-chart" id="chart-uso"></div>
+      <div class="bar-labels" id="chart-labels"></div>
+    </div>
+
+    <!-- Top eventos -->
+    <div class="section">
+      <h2>🔥 Top eventos mais consultados (votos)</h2>
+      <div class="top-list" id="top-eventos">
+        <div class="loading">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- Distribuição de votos -->
+    <div class="section">
+      <h2>📊 Distribuição de votos hoje</h2>
+      <div id="dist-votos">
+        <div class="loading">Carregando...</div>
+      </div>
+    </div>
+
+    <div class="legend-link">
+      💡 Para métricas mais detalhadas (origem do tráfego, dispositivos, tempo médio), acesse o
+      <a href="https://analytics.google.com" target="_blank">Google Analytics</a>
+      ·
+      <a href="https://console.firebase.google.com/project/zona-quente-rj/analytics" target="_blank">Firebase Analytics</a>
+    </div>
+
+    <div style="margin-top: 14px; text-align: center;">
+      <button class="refresh" onclick="carregarDados()">🔄 Atualizar dados</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let usuarioLogado = null;
+
+async function fazerLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  errorEl.classList.remove('show');
+
+  if (!email || !senha) {
+    errorEl.textContent = 'Preencha email e senha';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  try {
+    const { auth, signInWithEmailAndPassword } = window.zqDashboard;
+    await signInWithEmailAndPassword(auth, email, senha);
+  } catch (err) {
+    let msg = 'Erro ao entrar';
+    if (err.code === 'auth/invalid-credential') msg = 'Email ou senha incorretos';
+    errorEl.textContent = msg;
+    errorEl.classList.add('show');
+  }
+}
+
+async function fazerLogout() {
+  if (!confirm('Sair?')) return;
+  const { auth, signOut } = window.zqDashboard;
+  await signOut(auth);
+}
+
+function iniciarAuth() {
+  if (!window.zqDashboard) { setTimeout(iniciarAuth, 100); return; }
+
+  const { auth, onAuthStateChanged } = window.zqDashboard;
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      usuarioLogado = user;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-content').classList.add('authenticated');
+      document.getElementById('user-email').textContent = user.email;
+      carregarDados();
+    } else {
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('app-content').classList.remove('authenticated');
+    }
+  });
+}
+
+document.getElementById('login-password').addEventListener('keypress', e => {
+  if (e.key === 'Enter') fazerLogin();
+});
+
+iniciarAuth();
+
+/* ============================================================
+   CARREGAR DADOS DO FIRESTORE
+   ============================================================ */
+async function carregarDados() {
+  const { db, collection, getDocs } = window.zqDashboard;
+  const agora = Date.now();
+  const HOJE = new Date().toISOString().split('T')[0];
+  const UM_DIA = 24 * 60 * 60 * 1000;
+  const UMA_SEMANA = 7 * UM_DIA;
+
+  try {
+    // 1. Buscar todos os dispositivos
+    const dispSnap = await getDocs(collection(db, 'dispositivos'));
+    const dispositivos = dispSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const ativosHoje = dispositivos.filter(d => d.ultimo_acesso_dia === HOJE).length;
+    const ativosSemana = dispositivos.filter(d => (agora - (d.ultimo_acesso || 0)) < UMA_SEMANA).length;
+    const total = dispositivos.length;
+    const comNotif = dispositivos.filter(d => d.notif_ativadas).length;
+
+    document.getElementById('m-hoje').textContent = ativosHoje;
+    document.getElementById('m-hoje-sub').textContent = ativosHoje === 1 ? 'motorista' : 'motoristas';
+    document.getElementById('m-semana').textContent = ativosSemana;
+    document.getElementById('m-total').textContent = total;
+    document.getElementById('m-notif').textContent = comNotif;
+    const pctNotif = total > 0 ? Math.round(100 * comNotif / total) : 0;
+    document.getElementById('m-notif-sub').textContent = pctNotif + '% do total';
+
+    // 2. Buscar eventos
+    const evSnap = await getDocs(collection(db, 'eventos'));
+    const eventos = evSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const UMA_HORA = 60 * 60 * 1000;
+    const ativos = eventos.filter(ev => {
+      if (ev.recorrencia === 'recorrente' || !ev.fim_timestamp) return true;
+      return (agora - ev.fim_timestamp) < UMA_HORA;
+    });
+
+    const recorrentes = eventos.filter(e => e.recorrencia === 'recorrente').length;
+    document.getElementById('m-eventos').textContent = ativos.length;
+    document.getElementById('m-eventos-sub').textContent =
+      `${recorrentes} recorrente${recorrentes !== 1 ? 's' : ''} · ${ativos.length - recorrentes} pontuais`;
+
+    // 3. Calcular votos
+    let votosHoje = 0;
+    let votosSemana = 0;
+    const votosPorTipo = { fraco: 0, medio: 0, bom: 0, estourado: 0 };
+    const eventosPorVotos = [];
+
+    eventos.forEach(ev => {
+      const fbs = ev.feedbacks_recentes || [];
+      let fbHoje = 0;
+      let fbSemana = 0;
+      fbs.forEach(fb => {
+        const idade = agora - fb.timestamp;
+        if (idade < UM_DIA) {
+          votosHoje++;
+          fbHoje++;
+          if (votosPorTipo[fb.tipo] !== undefined) votosPorTipo[fb.tipo]++;
+        }
+        if (idade < UMA_SEMANA) {
+          votosSemana++;
+          fbSemana++;
+        }
+      });
+      if (fbSemana > 0) eventosPorVotos.push({ ...ev, total_votos: fbSemana });
+    });
+
+    document.getElementById('m-votos-hoje').textContent = votosHoje;
+    document.getElementById('m-votos-semana').textContent = votosSemana;
+    const compromisso = ativosSemana > 0 ? (votosSemana / ativosSemana).toFixed(1) : '0';
+    document.getElementById('m-compromisso').textContent = compromisso;
+
+    // 4. Top eventos
+    eventosPorVotos.sort((a, b) => b.total_votos - a.total_votos);
+    const top5 = eventosPorVotos.slice(0, 5);
+    const topEl = document.getElementById('top-eventos');
+    if (top5.length === 0) {
+      topEl.innerHTML = '<div class="empty">Nenhum voto registrado ainda essa semana</div>';
+    } else {
+      topEl.innerHTML = top5.map((ev, i) => `
+        <div class="top-item">
+          <div class="rank">#${i + 1}</div>
+          <div class="info">
+            <strong>${ev.nome}</strong>
+            <small>📍 ${ev.local}</small>
+          </div>
+          <div class="counts">
+            <span class="count-badge">${ev.total_votos} voto${ev.total_votos !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 5. Distribuição de votos hoje
+    const distEl = document.getElementById('dist-votos');
+    const totalVotosHoje = votosHoje;
+    if (totalVotosHoje === 0) {
+      distEl.innerHTML = '<div class="empty">Nenhum voto hoje ainda</div>';
+    } else {
+      const labels = {
+        fraco: { emoji: '🥶', cor: '#ef4444' },
+        medio: { emoji: '😐', cor: '#facc15' },
+        bom: { emoji: '🙂', cor: '#22c55e' },
+        estourado: { emoji: '🔥', cor: '#a855f7' }
+      };
+      distEl.innerHTML = Object.entries(votosPorTipo).map(([tipo, count]) => {
+        const pct = totalVotosHoje > 0 ? Math.round(100 * count / totalVotosHoje) : 0;
+        return `
+          <div style="margin-bottom: 10px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px;">
+              <span>${labels[tipo].emoji} ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</span>
+              <span style="color:#888;">${count} (${pct}%)</span>
+            </div>
+            <div style="background:#0d0d0d;height:8px;border-radius:4px;overflow:hidden;">
+              <div style="background:${labels[tipo].cor};height:100%;width:${pct}%;transition:width 0.3s;"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 6. Gráfico de barras dos últimos 7 dias
+    const chartEl = document.getElementById('chart-uso');
+    const labelsEl = document.getElementById('chart-labels');
+    const dias = [];
+    const usoPorDia = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * UM_DIA);
+      const diaStr = d.toISOString().split('T')[0];
+      const labelStr = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getDay()];
+      dias.push({ str: diaStr, label: labelStr });
+      const count = dispositivos.filter(disp => disp.ultimo_acesso_dia === diaStr).length;
+      usoPorDia.push(count);
+    }
+    const maxUso = Math.max(1, ...usoPorDia);
+    chartEl.innerHTML = usoPorDia.map(v => {
+      const altura = (v / maxUso) * 100;
+      return `<div class="bar" style="height:${altura}%;" title="${v} motorista${v !== 1 ? 's' : ''}"><span style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:10px;color:#aaa;">${v}</span></div>`;
+    }).join('');
+    labelsEl.innerHTML = dias.map(d => `<div class="bar-label">${d.label}</div>`).join('');
+
+  } catch (err) {
+    console.error('Erro ao carregar dados:', err);
+    alert('Erro ao carregar dados. Verifique o console.');
+  }
+}
+</script>
+
+</body>
+</html>
